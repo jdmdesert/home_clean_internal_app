@@ -1,0 +1,10 @@
+{
+  "name": "Desert Home Cleaning Work Board",
+  "short_name": "DHC Work",
+  "description": "Private work scheduling for the Desert Home Cleaning team.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f7f5ef",
+  "theme_color": "#17352d",
+  "icons": [{"src":"/icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}]
+}
