@@ -1,6 +1,7 @@
 -- Desert Home Cleaning internal app
 create type public.user_role as enum ('owner', 'employee');
 create type public.block_status as enum ('open', 'claimed', 'completed', 'cancelled');
+create type public.occupancy_status as enum ('vacant', 'occupied');
 
 create table public.profiles (
   id uuid primary key references auth.users(id) on delete cascade,
@@ -17,6 +18,8 @@ create table public.work_blocks (
   ends_at timestamptz not null check (ends_at > starts_at),
   city text not null,
   postal_code text not null check (postal_code ~ '^[0-9]{5}$'),
+  occupancy public.occupancy_status not null,
+  owners_present boolean,
   employee_pay numeric(8,2) not null check (employee_pay > 0),
   tasks text[] not null default '{}',
   status public.block_status not null default 'open',
@@ -24,6 +27,10 @@ create table public.work_blocks (
   claimed_at timestamptz,
   created_by uuid not null references public.profiles(id),
   created_at timestamptz not null default now(),
+  constraint owners_presence_consistent check (
+    (occupancy = 'vacant' and owners_present is null)
+    or (occupancy = 'occupied' and owners_present is not null)
+  ),
   constraint claim_state_consistent check (
     (status = 'open' and claimed_by is null and claimed_at is null) or status <> 'open'
   )
