@@ -5,18 +5,26 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 type Role = "owner" | "employee";
 type Status = "open" | "claimed" | "completed";
 type WorkBlock = {
-  id: string; title: string; date: string; startTime: string; duration: number;
-  area: string; address: string; pay: number; details: string[]; notes: string;
+  id: string; title: string; date: string; startTime: string; endTime: string;
+  city: string; zip: string; address: string; pay: number; details: string[]; notes: string;
   status: Status; claimedBy?: string;
 };
 
+const jobTemplates: Record<string, string[]> = {
+  "Airbnb Cleaning": ["Clean and sanitize kitchen", "Clean bathrooms", "Change linens", "Restock guest supplies", "Vacuum and mop all floors"],
+  "Move-out Cleaning": ["Deep clean kitchen and appliances", "Clean inside cabinets", "Clean bathrooms", "Wipe baseboards", "Vacuum and mop all floors"],
+  "Recurring Cleaning": ["Clean kitchen surfaces", "Clean bathrooms", "Dust accessible surfaces", "Vacuum and mop all floors", "Empty trash"],
+  "Deep Cleaning": ["Deep clean kitchen", "Scrub bathrooms", "Dust blinds and fans", "Wipe doors and baseboards", "Vacuum and mop all floors"],
+  "Custom Job": [],
+};
+
 const seedBlocks: WorkBlock[] = [
-  { id: "seed-1", title: "Move-out clean", date: "2026-07-02", startTime: "09:00", duration: 4,
-    area: "North Scottsdale", address: "7420 E. Desert Cove Ave, Scottsdale", pay: 120,
+  { id: "seed-1", title: "Move-out Cleaning", date: "2026-07-02", startTime: "09:00", endTime: "13:00",
+    city: "Scottsdale", zip: "85254", address: "7420 E. Desert Cove Ave, Scottsdale, AZ 85254", pay: 120,
     details: ["3 bed / 2 bath", "Inside oven", "Inside cabinets"],
     notes: "Home is vacant. Lockbox details appear after acceptance.", status: "open" },
-  { id: "seed-2", title: "Recurring home clean", date: "2026-07-03", startTime: "13:30", duration: 3,
-    area: "Paradise Valley", address: "5114 N. Mockingbird Ln, Paradise Valley", pay: 90,
+  { id: "seed-2", title: "Airbnb Cleaning", date: "2026-07-03", startTime: "13:30", endTime: "16:30",
+    city: "Paradise Valley", zip: "85253", address: "5114 N. Mockingbird Ln, Paradise Valley, AZ 85253", pay: 90,
     details: ["2 bed / 2 bath", "Standard clean", "Pet-friendly products"],
     notes: "One friendly dog will be home.", status: "open" },
 ];
@@ -38,7 +46,11 @@ export default function Home() {
 
   useEffect(() => {
     const saved = localStorage.getItem("dhc-demo-blocks");
-    if (saved) queueMicrotask(() => setBlocks(JSON.parse(saved)));
+    if (saved) {
+      const parsed = JSON.parse(saved) as Array<WorkBlock & { duration?: number; area?: string }>;
+      const compatible = parsed.every((block) => block.endTime && block.city && block.zip);
+      if (compatible) queueMicrotask(() => setBlocks(parsed));
+    }
   }, []);
   useEffect(() => { localStorage.setItem("dhc-demo-blocks", JSON.stringify(blocks)); }, [blocks]);
 
@@ -114,8 +126,8 @@ function JobCard({ block, onClaim }: { block: WorkBlock; onClaim: (id: string) =
     <div className="job-top"><div><span className="status-pill">{claimed ? "YOUR WORK" : "AVAILABLE"}</span>
       <h2>{block.title}</h2></div><strong className="pay">${block.pay}<small> total</small></strong></div>
     <div className="facts">
-      <p><span>▣</span><b>{day(block.date)}</b><small>{time(block.startTime)} · About {block.duration} hours</small></p>
-      <p><span>⌖</span><b>{claimed ? block.address : block.area}</b>
+      <p><span>▣</span><b>{day(block.date)}</b><small>{time(block.startTime)}–{time(block.endTime)}</small></p>
+      <p><span>⌖</span><b>{claimed ? block.address : `${block.city}, AZ ${block.zip}`}</b>
         <small>{claimed ? "Full address unlocked" : "Exact address after acceptance"}</small></p>
     </div>
     <div className="task-list">{block.details.map((detail) => <span key={detail}>✓ {detail}</span>)}</div>
@@ -143,7 +155,7 @@ function OwnerView({ blocks, onCreate }: { blocks: WorkBlock[]; onCreate: () => 
       {blocks.map((block) => <article className="owner-row" key={block.id}>
         <div className="date-box"><b>{new Date(`${block.date}T12:00`).toLocaleDateString("en-US", { day: "2-digit" })}</b>
           <span>{new Date(`${block.date}T12:00`).toLocaleDateString("en-US", { month: "short" })}</span></div>
-        <div className="row-main"><b>{block.title}</b><span>{time(block.startTime)} · {block.area}</span></div>
+        <div className="row-main"><b>{block.title}</b><span>{time(block.startTime)}–{time(block.endTime)} · {block.city}, AZ {block.zip}</span></div>
         <div className="assignee"><span className={`dot ${block.status}`} />{block.claimedBy || "Open to team"}</div>
         <strong className="row-pay">${block.pay}</strong>
       </article>)}
@@ -152,11 +164,28 @@ function OwnerView({ blocks, onCreate }: { blocks: WorkBlock[]; onCreate: () => 
 }
 
 function CreateBlock({ onClose, onCreate }: { onClose: () => void; onCreate: (block: WorkBlock) => void }) {
+  const [jobType, setJobType] = useState("Airbnb Cleaning");
+  const [tasks, setTasks] = useState(jobTemplates["Airbnb Cleaning"].join("\n"));
+  const [preview, setPreview] = useState({ date: "", start: "", end: "", city: "", zip: "", pay: "" });
+  const [formError, setFormError] = useState("");
+
+  function selectTemplate(value: string) {
+    setJobType(value);
+    setTasks(jobTemplates[value].join("\n"));
+  }
+
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const data = new FormData(event.currentTarget);
-    onCreate({ id: crypto.randomUUID(), title: String(data.get("title")), date: String(data.get("date")),
-      startTime: String(data.get("time")), duration: Number(data.get("duration")), area: String(data.get("area")),
+    if (String(data.get("endTime")) <= String(data.get("startTime"))) {
+      setFormError("End time must be later than the start time.");
+      return;
+    }
+    setFormError("");
+    const title = jobType === "Custom Job" ? String(data.get("customTitle")) : jobType;
+    onCreate({ id: crypto.randomUUID(), title, date: String(data.get("date")),
+      startTime: String(data.get("startTime")), endTime: String(data.get("endTime")),
+      city: String(data.get("city")), zip: String(data.get("zip")),
       address: String(data.get("address")), pay: Number(data.get("pay")),
       details: String(data.get("details")).split("\n").map((item) => item.trim()).filter(Boolean),
       notes: String(data.get("notes")), status: "open" });
@@ -165,17 +194,43 @@ function CreateBlock({ onClose, onCreate }: { onClose: () => void; onCreate: (bl
     <div className="modal" onMouseDown={(e) => e.stopPropagation()}>
       <button className="close" onClick={onClose}>×</button>
       <p className="eyebrow">NEW WORK BLOCK</p><h2>Post work to your team</h2>
-      <p className="form-intro">Employees see the schedule, area, tasks, and pay before accepting.</p>
-      <form onSubmit={submit}>
-        <label className="wide">Job name<input name="title" required placeholder="e.g. Move-out clean" /></label>
+      <p className="form-intro">Choose a template, confirm the details, and post it to the team.</p>
+      <form onSubmit={submit} onChange={(event) => {
+        const form = event.currentTarget;
+        const data = new FormData(form);
+        setPreview({ date: String(data.get("date")), start: String(data.get("startTime")),
+          end: String(data.get("endTime")), city: String(data.get("city")),
+          zip: String(data.get("zip")), pay: String(data.get("pay")) });
+      }}>
+        <label className="wide">Job type
+          <select name="jobType" value={jobType} onChange={(event) => selectTemplate(event.target.value)}>
+            {Object.keys(jobTemplates).map((name) => <option key={name}>{name}</option>)}
+          </select>
+        </label>
+        {jobType === "Custom Job" && <label className="wide">Custom job name
+          <input name="customTitle" required placeholder="Enter the job type" /></label>}
         <label>Date<input name="date" type="date" required /></label>
-        <label>Start time<input name="time" type="time" required /></label>
-        <label>Hours<input name="duration" type="number" min="1" step=".5" required placeholder="3" /></label>
-        <label>Employee pay ($)<input name="pay" type="number" min="1" required placeholder="90" /></label>
-        <label className="wide">General area<input name="area" required placeholder="North Scottsdale" /></label>
-        <label className="wide">Exact address<input name="address" required placeholder="Shown only after acceptance" /></label>
-        <label className="wide">Tasks<textarea name="details" required rows={3} placeholder={"3 bed / 2 bath\nInside oven\nInterior windows"} /></label>
+        <label>Employee pay ($)<input name="pay" type="number" min="1" required placeholder="110" /></label>
+        <label>Start time<input name="startTime" type="time" required /></label>
+        <label>End time<input name="endTime" type="time" required /></label>
+        <label>City<input name="city" required placeholder="Scottsdale" /></label>
+        <label>ZIP code<input name="zip" required inputMode="numeric" pattern="[0-9]{5}" maxLength={5} placeholder="85254" /></label>
+        <label className="wide">Full street address
+          <input name="address" required placeholder="Hidden until an employee accepts" />
+          <small className="field-note">Only the assigned employee will see this address.</small>
+        </label>
+        <label className="wide">Cleaning checklist
+          <textarea name="details" required rows={5} value={tasks} onChange={(event) => setTasks(event.target.value)} />
+          <small className="field-note">One task per line. Templates can be adjusted for each job.</small>
+        </label>
         <label className="wide">Private job notes<textarea name="notes" rows={2} placeholder="Entry instructions, pets, supplies…" /></label>
+        <div className="job-preview wide">
+          <span>EMPLOYEE PREVIEW</span><b>{jobType}</b>
+          <p>{preview.city || "City"}, AZ {preview.zip || "ZIP"} · {preview.date ? day(preview.date) : "Date"}</p>
+          <p>{preview.start ? time(preview.start) : "Start"}–{preview.end ? time(preview.end) : "End"} · <strong>${preview.pay || "0"} pay</strong></p>
+          <small>Full address remains hidden until acceptance.</small>
+        </div>
+        {formError && <p className="form-error wide">{formError}</p>}
         <div className="form-actions"><button type="button" className="secondary" onClick={onClose}>Cancel</button>
           <button className="primary">Post work block</button></div>
       </form>

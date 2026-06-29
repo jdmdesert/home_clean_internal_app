@@ -14,12 +14,11 @@ create table public.work_blocks (
   id uuid primary key default gen_random_uuid(),
   title text not null,
   starts_at timestamptz not null,
-  estimated_hours numeric(4,1) not null check (estimated_hours > 0),
-  area text not null,
-  address text not null,
+  ends_at timestamptz not null check (ends_at > starts_at),
+  city text not null,
+  postal_code text not null check (postal_code ~ '^[0-9]{5}$'),
   employee_pay numeric(8,2) not null check (employee_pay > 0),
   tasks text[] not null default '{}',
-  private_notes text,
   status public.block_status not null default 'open',
   claimed_by uuid references public.profiles(id),
   claimed_at timestamptz,
@@ -28,6 +27,14 @@ create table public.work_blocks (
   constraint claim_state_consistent check (
     (status = 'open' and claimed_by is null and claimed_at is null) or status <> 'open'
   )
+);
+
+-- Kept separate so an employee cannot retrieve the exact location before claiming.
+create table public.work_block_private_details (
+  work_block_id uuid primary key references public.work_blocks(id) on delete cascade,
+  address text not null,
+  private_notes text,
+  created_at timestamptz not null default now()
 );
 
 create table public.push_subscriptions (
@@ -41,6 +48,7 @@ create table public.push_subscriptions (
 
 alter table public.profiles enable row level security;
 alter table public.work_blocks enable row level security;
+alter table public.work_block_private_details enable row level security;
 alter table public.push_subscriptions enable row level security;
 
 create function public.is_owner()
@@ -63,6 +71,17 @@ create policy "owner creates work" on public.work_blocks
   for insert to authenticated with check (public.is_owner() and created_by = auth.uid());
 create policy "owner updates work" on public.work_blocks
   for update to authenticated using (public.is_owner()) with check (public.is_owner());
+create policy "owner manages private work details" on public.work_block_private_details
+  for all to authenticated using (public.is_owner()) with check (public.is_owner());
+create policy "assigned employee reads private work details" on public.work_block_private_details
+  for select to authenticated using (
+    exists (
+      select 1 from public.work_blocks
+      where public.work_blocks.id = public.work_block_private_details.work_block_id
+        and claimed_by = auth.uid()
+        and status in ('claimed', 'completed')
+    )
+  );
 create policy "users manage own push subscription" on public.push_subscriptions
   for all to authenticated using (user_id = auth.uid()) with check (user_id = auth.uid());
 
