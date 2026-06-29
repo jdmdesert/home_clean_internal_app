@@ -111,3 +111,26 @@ $$;
 
 revoke all on function public.claim_work_block(uuid) from public;
 grant execute on function public.claim_work_block(uuid) to authenticated;
+
+-- Owner-only reversal: removes the current employee and returns the block to the team.
+create or replace function public.unassign_work_block(block_id uuid)
+returns boolean
+language plpgsql security definer set search_path = ''
+as $$
+declare affected_rows integer;
+begin
+  if not public.is_owner() then
+    raise exception 'Only the owner can remove an assignment';
+  end if;
+
+  update public.work_blocks
+  set status = 'open', claimed_by = null, claimed_at = null
+  where id = block_id and status = 'claimed' and claimed_by is not null;
+
+  get diagnostics affected_rows = row_count;
+  return affected_rows > 0;
+end;
+$$;
+
+revoke all on function public.unassign_work_block(uuid) from public;
+grant execute on function public.unassign_work_block(uuid) to authenticated;
