@@ -7,6 +7,7 @@ type Status = "open" | "claimed" | "completed";
 type WorkBlock = {
   id: string; title: string; date: string; startTime: string; endTime: string;
   city: string; zip: string; address: string; pay: number; details: string[]; notes: string;
+  occupancy: "vacant" | "occupied"; ownersPresent?: boolean;
   status: Status; claimedBy?: string;
 };
 
@@ -22,11 +23,11 @@ const seedBlocks: WorkBlock[] = [
   { id: "seed-1", title: "Move-out Cleaning", date: "2026-07-02", startTime: "09:00", endTime: "13:00",
     city: "Scottsdale", zip: "85254", address: "7420 E. Desert Cove Ave, Scottsdale, AZ 85254", pay: 120,
     details: ["3 bed / 2 bath", "Inside oven", "Inside cabinets"],
-    notes: "Home is vacant. Lockbox details appear after acceptance.", status: "open" },
+    notes: "Lockbox details appear after acceptance.", occupancy: "vacant", status: "open" },
   { id: "seed-2", title: "Airbnb Cleaning", date: "2026-07-03", startTime: "13:30", endTime: "16:30",
     city: "Paradise Valley", zip: "85253", address: "5114 N. Mockingbird Ln, Paradise Valley, AZ 85253", pay: 90,
     details: ["2 bed / 2 bath", "Standard clean", "Pet-friendly products"],
-    notes: "One friendly dog will be home.", status: "open" },
+    notes: "One friendly dog will be home.", occupancy: "occupied", ownersPresent: false, status: "open" },
 ];
 
 const day = (value: string) => new Intl.DateTimeFormat("en-US",
@@ -48,7 +49,7 @@ export default function Home() {
     const saved = localStorage.getItem("dhc-demo-blocks");
     if (saved) {
       const parsed = JSON.parse(saved) as Array<WorkBlock & { duration?: number; area?: string }>;
-      const compatible = parsed.every((block) => block.endTime && block.city && block.zip);
+      const compatible = parsed.every((block) => block.endTime && block.city && block.zip && block.occupancy);
       if (compatible) queueMicrotask(() => setBlocks(parsed));
     }
   }, []);
@@ -134,9 +135,15 @@ function JobCard({ block, onClaim }: { block: WorkBlock; onClaim: (id: string) =
     <div className="job-top"><div><span className="status-pill">{claimed ? "YOUR WORK" : "AVAILABLE"}</span>
       <h2>{block.title}</h2></div><strong className="pay">${block.pay}<small> total</small></strong></div>
     <div className="facts">
-      <p><span>▣</span><b>{day(block.date)}</b><small>{time(block.startTime)}–{time(block.endTime)}</small></p>
+      <p><span>▣</span><b>{day(block.date)}</b>
+        <small>Soonest arrival: {time(block.startTime)}<br />Latest departure: {time(block.endTime)}</small></p>
       <p><span>⌖</span><b>{claimed ? block.address : `${block.city}, AZ ${block.zip}`}</b>
         <small>{claimed ? "Full address unlocked" : "Exact address after acceptance"}</small></p>
+    </div>
+    <div className="occupancy">
+      <span>{block.occupancy === "vacant" ? "⌂ Vacant home" : "⌂ Occupied home"}</span>
+      {block.occupancy === "occupied" &&
+        <span>{block.ownersPresent ? "Owners will be present" : "Owners will not be present"}</span>}
     </div>
     <div className="task-list">{block.details.map((detail) => <span key={detail}>✓ {detail}</span>)}</div>
     {claimed && <p className="notes">{block.notes}</p>}
@@ -165,7 +172,10 @@ function OwnerView({ blocks, onCreate, onUnassign }: {
       {blocks.map((block) => <article className="owner-row" key={block.id}>
         <div className="date-box"><b>{new Date(`${block.date}T12:00`).toLocaleDateString("en-US", { day: "2-digit" })}</b>
           <span>{new Date(`${block.date}T12:00`).toLocaleDateString("en-US", { month: "short" })}</span></div>
-        <div className="row-main"><b>{block.title}</b><span>{time(block.startTime)}–{time(block.endTime)} · {block.city}, AZ {block.zip}</span></div>
+        <div className="row-main"><b>{block.title}</b>
+          <span>Arrival {time(block.startTime)} · Departure {time(block.endTime)} · {block.city}, AZ {block.zip}</span>
+          <small>{block.occupancy === "vacant" ? "Vacant" : `Occupied · Owners ${block.ownersPresent ? "present" : "not present"}`}</small>
+        </div>
         <div className="assignee"><span className={`dot ${block.status}`} />{block.claimedBy || "Open to team"}</div>
         <strong className="row-pay">${block.pay}</strong>
         <div className="row-actions">{block.claimedBy
@@ -180,6 +190,7 @@ function OwnerView({ blocks, onCreate, onUnassign }: {
 function CreateBlock({ onClose, onCreate }: { onClose: () => void; onCreate: (block: WorkBlock) => void }) {
   const [jobType, setJobType] = useState("Airbnb Cleaning");
   const [tasks, setTasks] = useState(jobTemplates["Airbnb Cleaning"].join("\n"));
+  const [occupancy, setOccupancy] = useState<"vacant" | "occupied">("vacant");
   const [preview, setPreview] = useState({ date: "", start: "", end: "", city: "", zip: "", pay: "" });
   const [formError, setFormError] = useState("");
 
@@ -202,7 +213,9 @@ function CreateBlock({ onClose, onCreate }: { onClose: () => void; onCreate: (bl
       city: String(data.get("city")), zip: String(data.get("zip")),
       address: String(data.get("address")), pay: Number(data.get("pay")),
       details: String(data.get("details")).split("\n").map((item) => item.trim()).filter(Boolean),
-      notes: String(data.get("notes")), status: "open" });
+      notes: String(data.get("notes")), occupancy,
+      ownersPresent: occupancy === "occupied" ? data.get("ownersPresent") === "yes" : undefined,
+      status: "open" });
   }
   return <div className="modal-backdrop" onMouseDown={onClose}>
     <div className="modal" onMouseDown={(e) => e.stopPropagation()}>
@@ -225,10 +238,22 @@ function CreateBlock({ onClose, onCreate }: { onClose: () => void; onCreate: (bl
           <input name="customTitle" required placeholder="Enter the job type" /></label>}
         <label>Date<input name="date" type="date" required /></label>
         <label>Employee pay ($)<input name="pay" type="number" min="1" required placeholder="110" /></label>
-        <label>Start time<input name="startTime" type="time" required /></label>
-        <label>End time<input name="endTime" type="time" required /></label>
+        <label>Soonest arrival time<input name="startTime" type="time" required /></label>
+        <label>Latest departure time<input name="endTime" type="time" required /></label>
         <label>City<input name="city" required placeholder="Scottsdale" /></label>
         <label>ZIP code<input name="zip" required inputMode="numeric" pattern="[0-9]{5}" maxLength={5} placeholder="85254" /></label>
+        <label>Home status
+          <select name="occupancy" value={occupancy} onChange={(event) => setOccupancy(event.target.value as "vacant" | "occupied")}>
+            <option value="vacant">Vacant</option>
+            <option value="occupied">Occupied</option>
+          </select>
+        </label>
+        {occupancy === "occupied" && <label>Will owners be present?
+          <select name="ownersPresent" defaultValue="yes">
+            <option value="yes">Yes, owners present</option>
+            <option value="no">No, owners not present</option>
+          </select>
+        </label>}
         <label className="wide">Full street address
           <input name="address" required placeholder="Hidden until an employee accepts" />
           <small className="field-note">Only the assigned employee will see this address.</small>
@@ -241,7 +266,9 @@ function CreateBlock({ onClose, onCreate }: { onClose: () => void; onCreate: (bl
         <div className="job-preview wide">
           <span>EMPLOYEE PREVIEW</span><b>{jobType}</b>
           <p>{preview.city || "City"}, AZ {preview.zip || "ZIP"} · {preview.date ? day(preview.date) : "Date"}</p>
-          <p>{preview.start ? time(preview.start) : "Start"}–{preview.end ? time(preview.end) : "End"} · <strong>${preview.pay || "0"} pay</strong></p>
+          <p>Soonest arrival: {preview.start ? time(preview.start) : "—"}<br />
+            Latest departure: {preview.end ? time(preview.end) : "—"} · <strong>${preview.pay || "0"} pay</strong></p>
+          <p>{occupancy === "vacant" ? "Vacant home" : "Occupied home"}</p>
           <small>Full address remains hidden until acceptance.</small>
         </div>
         {formError && <p className="form-error wide">{formError}</p>}
