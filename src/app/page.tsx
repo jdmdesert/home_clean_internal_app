@@ -74,6 +74,14 @@ export default function Home() {
     setShowForm(false);
     notify("Work block posted to the team.");
   }
+  function unassignBlock(id: string) {
+    const block = blocks.find((item) => item.id === id);
+    if (!block?.claimedBy) return;
+    if (!window.confirm(`Remove ${block.claimedBy} from this job and make it available again?`)) return;
+    setBlocks((current) => current.map((item) =>
+      item.id === id ? { ...item, status: "open", claimedBy: undefined } : item));
+    notify("Assignment removed. The work block is available again.");
+  }
 
   return (
     <main>
@@ -91,7 +99,7 @@ export default function Home() {
       </div>
       {role === "employee"
         ? <EmployeeView blocks={shown} availableCount={available.length} tab={tab} setTab={setTab} claim={claim} />
-        : <OwnerView blocks={blocks} onCreate={() => setShowForm(true)} />}
+        : <OwnerView blocks={blocks} onCreate={() => setShowForm(true)} onUnassign={unassignBlock} />}
       {showForm && <CreateBlock onClose={() => setShowForm(false)} onCreate={createBlock} />}
       {toast && <div className="toast"><span>✓</span>{toast}</div>}
     </main>
@@ -136,7 +144,9 @@ function JobCard({ block, onClaim }: { block: WorkBlock; onClaim: (id: string) =
   </article>;
 }
 
-function OwnerView({ blocks, onCreate }: { blocks: WorkBlock[]; onCreate: () => void }) {
+function OwnerView({ blocks, onCreate, onUnassign }: {
+  blocks: WorkBlock[]; onCreate: () => void; onUnassign: (id: string) => void;
+}) {
   const counts = useMemo(() => ({
     open: blocks.filter((b) => b.status === "open").length,
     claimed: blocks.filter((b) => b.status === "claimed").length,
@@ -158,6 +168,10 @@ function OwnerView({ blocks, onCreate }: { blocks: WorkBlock[]; onCreate: () => 
         <div className="row-main"><b>{block.title}</b><span>{time(block.startTime)}–{time(block.endTime)} · {block.city}, AZ {block.zip}</span></div>
         <div className="assignee"><span className={`dot ${block.status}`} />{block.claimedBy || "Open to team"}</div>
         <strong className="row-pay">${block.pay}</strong>
+        <div className="row-actions">{block.claimedBy
+          ? <button className="unassign" onClick={() => onUnassign(block.id)}>Remove assignment</button>
+          : <span>—</span>}
+        </div>
       </article>)}
     </div>
   </section>;
