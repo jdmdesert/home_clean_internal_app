@@ -7,7 +7,10 @@ export type EmployeeStanding = "new" | "good" | "watch" | "risk";
 export type EmployeeProfile = {
   id: string;
   language: "English" | "Español";
+  firstName: string;
+  lastName: string;
   name: string;
+  dateOfBirth: string;
   email: string;
   phone: string;
   paymentMethod: "Zelle" | "ACH" | "Check" | "Other";
@@ -35,7 +38,8 @@ export function EmployeeRegistration({ onComplete, onCancel }: {
   const copy = spanish ? {
     eyebrow: "REGISTRO DE EMPLEADO", title: "Cuéntanos sobre ti",
     intro: "Esta información se utiliza para trabajo y pagos.",
-    name: "Nombre completo", email: "Correo electrónico", phone: "Número de teléfono",
+    firstName: "Nombre", lastName: "Apellido", dob: "Fecha de nacimiento",
+    email: "Correo electrónico", phone: "Número de teléfono",
     payment: "¿Cómo prefieres recibir tu pago?", paymentContact: "Correo o teléfono para el pago",
     area: "Ciudades o área donde prefieres trabajar", emergency: "Contacto de emergencia (opcional)",
     consent: "Confirmo que esta información es correcta y acepto recibir avisos de trabajo.",
@@ -43,7 +47,8 @@ export function EmployeeRegistration({ onComplete, onCancel }: {
   } : {
     eyebrow: "EMPLOYEE REGISTRATION", title: "Tell us about yourself",
     intro: "We use this information for work communication and payments.",
-    name: "Full name", email: "Email address", phone: "Phone number",
+    firstName: "First name", lastName: "Last name", dob: "Date of birth",
+    email: "Email address", phone: "Phone number",
     payment: "How would you like to be paid?", paymentContact: "Email or phone used for payment",
     area: "Cities or area where you prefer to work", emergency: "Emergency contact (optional)",
     consent: "I confirm this information is correct and agree to receive work notifications.",
@@ -55,8 +60,11 @@ export function EmployeeRegistration({ onComplete, onCancel }: {
     if (!language) return;
     const data = new FormData(event.currentTarget);
     const method = String(data.get("paymentMethod")) as EmployeeProfile["paymentMethod"];
+    const firstName = String(data.get("firstName")).trim();
+    const lastName = String(data.get("lastName")).trim();
     onComplete({
-      id: crypto.randomUUID(), language, name: String(data.get("name")),
+      id: crypto.randomUUID(), language, firstName, lastName, name: `${firstName} ${lastName}`,
+      dateOfBirth: String(data.get("dateOfBirth")),
       email: String(data.get("email")), phone: String(data.get("phone")),
       paymentMethod: method, paymentContact: String(data.get("paymentContact")),
       serviceArea: String(data.get("serviceArea")), emergencyContact: String(data.get("emergencyContact")),
@@ -87,7 +95,9 @@ export function EmployeeRegistration({ onComplete, onCancel }: {
       <button className="registration-back" onClick={() => setLanguage(null)}>← {copy.back}</button>
       <p className="eyebrow">{copy.eyebrow}</p><h1>{copy.title}</h1><p>{copy.intro}</p>
       <form onSubmit={submit}>
-        <label>{copy.name}<input name="name" autoComplete="name" required /></label>
+        <label>{copy.firstName}<input name="firstName" autoComplete="given-name" required /></label>
+        <label>{copy.lastName}<input name="lastName" autoComplete="family-name" required /></label>
+        <label>{copy.dob}<input name="dateOfBirth" type="date" max={new Date().toISOString().slice(0, 10)} required /></label>
         <label>{copy.email}<input name="email" type="email" autoComplete="email" required /></label>
         <label>{copy.phone}<input name="phone" type="tel" autoComplete="tel" required placeholder="(602) 555-0100" /></label>
         <label>{copy.payment}
