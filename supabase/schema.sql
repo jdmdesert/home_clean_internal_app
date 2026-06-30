@@ -115,13 +115,22 @@ returns boolean language sql stable security definer set search_path = '' as $$
   );
 $$;
 
+create function public.is_active_employee()
+returns boolean language sql stable security definer set search_path = '' as $$
+  select exists (
+    select 1 from public.profiles
+    where id = auth.uid() and role = 'employee' and active and onboarding_complete
+  );
+$$;
+
 create policy "owner or self reads profile" on public.profiles
   for select to authenticated using (public.is_owner() or id = auth.uid());
 create policy "owner manages profiles" on public.profiles
   for all to authenticated using (public.is_owner()) with check (public.is_owner());
 create policy "team reads work blocks" on public.work_blocks
   for select to authenticated using (
-    public.is_owner() or status = 'open' or claimed_by = auth.uid()
+    public.is_owner()
+    or (public.is_active_employee() and (status = 'open' or claimed_by = auth.uid()))
   );
 create policy "owner creates work" on public.work_blocks
   for insert to authenticated with check (public.is_owner() and created_by = auth.uid());
@@ -191,6 +200,26 @@ $$;
 
 revoke all on function public.register_employee(text, text, text, public.payment_method, text, text, text) from public;
 grant execute on function public.register_employee(text, text, text, public.payment_method, text, text, text) to authenticated;
+
+create or replace function public.set_employee_active(employee_id uuid, active_input boolean)
+returns boolean
+language plpgsql security definer set search_path = ''
+as $$
+begin
+  if not public.is_owner() then
+    raise exception 'Only the owner can change employee account status';
+  end if;
+
+  update public.profiles
+  set active = active_input
+  where id = employee_id and role = 'employee';
+
+  return found;
+end;
+$$;
+
+revoke all on function public.set_employee_active(uuid, boolean) from public;
+grant execute on function public.set_employee_active(uuid, boolean) to authenticated;
 
 create view public.employee_payment_totals
 with (security_invoker = true)

@@ -13,10 +13,16 @@ const standingCopy: Record<EmployeeStanding, { label: string; description: strin
 const money = (value: number) => new Intl.NumberFormat("en-US",
   { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(value);
 
-export function EmployeeDirectory({ employees }: { employees: EmployeeProfile[] }) {
+export function EmployeeDirectory({ employees, onSetActive }: {
+  employees: EmployeeProfile[]; onSetActive: (id: string, active: boolean) => void;
+}) {
   const [selected, setSelected] = useState<EmployeeProfile | null>(null);
 
-  if (selected) return <EmployeeDetail employee={selected} onBack={() => setSelected(null)} />;
+  if (selected) return <EmployeeDetail employee={selected} onBack={() => setSelected(null)}
+    onSetActive={(active) => {
+      onSetActive(selected.id, active);
+      setSelected({ ...selected, active });
+    }} />;
 
   return <div className="employee-directory">
     <div className="directory-heading"><div><h2>Registered employees</h2>
@@ -24,7 +30,11 @@ export function EmployeeDirectory({ employees }: { employees: EmployeeProfile[] 
     <div className="employee-stack">
       {employees.map((employee) => <button className="employee-row" key={employee.id} onClick={() => setSelected(employee)}>
         <div className="employee-initials">{employee.name.split(" ").map((part) => part[0]).slice(0, 2).join("")}</div>
-        <div className="employee-name"><b>{employee.name}</b><span>{employee.phone}</span></div>
+        <div className="employee-name"><b>{employee.name}</b><span>{employee.phone}</span>
+          <span className={`account-status ${employee.active ? "active" : "inactive"}`}>
+            <i />{employee.active ? "Active" : "Inactive"}
+          </span>
+        </div>
         <StandingRing employee={employee} />
         <span className="employee-chevron">›</span>
       </button>)}
@@ -41,14 +51,29 @@ function StandingRing({ employee }: { employee: EmployeeProfile }) {
   </div>;
 }
 
-function EmployeeDetail({ employee, onBack }: { employee: EmployeeProfile; onBack: () => void }) {
+function EmployeeDetail({ employee, onBack, onSetActive }: {
+  employee: EmployeeProfile; onBack: () => void; onSetActive: (active: boolean) => void;
+}) {
+  function toggleActive() {
+    const action = employee.active ? "Deactivate" : "Reactivate";
+    if (!window.confirm(`${action} ${employee.name}'s account?`)) return;
+    onSetActive(!employee.active);
+  }
   return <div className="employee-detail">
     <button className="detail-back" onClick={onBack}>← All employees</button>
     <div className="profile-header">
       <div className="profile-avatar">{employee.name.split(" ").map((part) => part[0]).slice(0, 2).join("")}</div>
       <div><p className="eyebrow">EMPLOYEE PROFILE</p><h2>{employee.name}</h2>
-        <p>Team member since {new Date(employee.joinedAt).toLocaleDateString("en-US", { month: "long", year: "numeric" })}</p></div>
+        <p>Team member since {new Date(employee.joinedAt).toLocaleDateString("en-US", { month: "long", year: "numeric" })}</p>
+        <span className={`account-status ${employee.active ? "active" : "inactive"}`}>
+          <i />{employee.active ? "Active" : "Inactive"}</span></div>
       <StandingRing employee={employee} />
+    </div>
+    <div className="account-actions">
+      <div><b>{employee.active ? "Active account" : "Inactive account"}</b>
+        <span>{employee.active ? "Can receive and accept new work." : "Cannot receive or accept new work."}</span></div>
+      <button className={employee.active ? "deactivate-button" : "reactivate-button"} onClick={toggleActive}>
+        {employee.active ? "Deactivate employee" : "Reactivate employee"}</button>
     </div>
     <div className="payment-summary">
       <div><span>Paid this month</span><strong>{money(employee.paidMonth)}</strong></div>
