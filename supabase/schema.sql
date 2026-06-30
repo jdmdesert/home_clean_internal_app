@@ -2,13 +2,28 @@
 create type public.user_role as enum ('owner', 'employee');
 create type public.block_status as enum ('open', 'claimed', 'completed', 'cancelled');
 create type public.occupancy_status as enum ('vacant', 'occupied');
+create type public.payment_method as enum ('zelle', 'ach', 'check', 'other');
+create type public.employee_standing as enum ('new', 'good', 'watch', 'risk');
 
 create table public.profiles (
   id uuid primary key references auth.users(id) on delete cascade,
   full_name text not null,
   role public.user_role not null default 'employee',
+  preferred_language text check (preferred_language in ('English', 'Español')),
+  phone text,
+  payment_method public.payment_method,
+  payment_contact text,
+  service_area text,
+  emergency_contact text,
+  onboarding_complete boolean not null default false,
+  standing public.employee_standing not null default 'new',
+  performance_score integer check (performance_score between 0 and 100),
+  standing_note text,
   active boolean not null default true,
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  constraint new_employee_score_consistent check (
+    (standing = 'new' and performance_score is null) or standing <> 'new'
+  )
 );
 
 create table public.work_blocks (
@@ -74,12 +89,23 @@ create table public.email_outbox (
   created_at timestamptz not null default now()
 );
 
+create table public.employee_payments (
+  id bigint generated always as identity primary key,
+  employee_id uuid not null references public.profiles(id) on delete restrict,
+  work_block_id uuid references public.work_blocks(id) on delete set null,
+  amount numeric(8,2) not null check (amount > 0),
+  paid_at timestamptz not null default now(),
+  note text,
+  created_at timestamptz not null default now()
+);
+
 alter table public.profiles enable row level security;
 alter table public.work_blocks enable row level security;
 alter table public.work_block_private_details enable row level security;
 alter table public.push_subscriptions enable row level security;
 alter table public.owner_notifications enable row level security;
 alter table public.email_outbox enable row level security;
+alter table public.employee_payments enable row level security;
 
 create function public.is_owner()
 returns boolean language sql stable security definer set search_path = '' as $$
@@ -89,8 +115,8 @@ returns boolean language sql stable security definer set search_path = '' as $$
   );
 $$;
 
-create policy "team can read active profiles" on public.profiles
-  for select to authenticated using (active);
+create policy "owner or self reads profile" on public.profiles
+  for select to authenticated using (public.is_owner() or id = auth.uid());
 create policy "owner manages profiles" on public.profiles
   for all to authenticated using (public.is_owner()) with check (public.is_owner());
 create policy "team reads work blocks" on public.work_blocks
@@ -118,6 +144,68 @@ create policy "owner reads own notifications" on public.owner_notifications
   for select to authenticated using (owner_id = auth.uid() and public.is_owner());
 create policy "owner reads email outbox" on public.email_outbox
   for select to authenticated using (public.is_owner());
+create policy "owner manages employee payments" on public.employee_payments
+  for all to authenticated using (public.is_owner()) with check (public.is_owner());
+create policy "employee reads own payments" on public.employee_payments
+  for select to authenticated using (employee_id = auth.uid());
+
+-- Registration stores only a payout preference/contact. Raw ACH account and routing
+-- numbers must be tokenized by a payment provider and never passed to this function.
+create or replace function public.register_employee(
+  full_name_input text,
+  language_input text,
+  phone_input text,
+  payment_method_input public.payment_method,
+  payment_contact_input text,
+  service_area_input text default null,
+  emergency_contact_input text default null
+)
+returns uuid
+language plpgsql security definer set search_path = ''
+as $$
+begin
+  if auth.uid() is null then raise exception 'Authentication required'; end if;
+  if language_input not in ('English', 'Español') then raise exception 'Unsupported language'; end if;
+
+  insert into public.profiles (
+    id, full_name, role, preferred_language, phone, payment_method, payment_contact,
+    service_area, emergency_contact, onboarding_complete
+  ) values (
+    auth.uid(), trim(full_name_input), 'employee', language_input, trim(phone_input),
+    payment_method_input, trim(payment_contact_input), nullif(trim(service_area_input), ''),
+    nullif(trim(emergency_contact_input), ''), true
+  )
+  on conflict (id) do update set
+    full_name = excluded.full_name,
+    preferred_language = excluded.preferred_language,
+    phone = excluded.phone,
+    payment_method = excluded.payment_method,
+    payment_contact = excluded.payment_contact,
+    service_area = excluded.service_area,
+    emergency_contact = excluded.emergency_contact,
+    onboarding_complete = true;
+
+  return auth.uid();
+end;
+$$;
+
+revoke all on function public.register_employee(text, text, text, public.payment_method, text, text, text) from public;
+grant execute on function public.register_employee(text, text, text, public.payment_method, text, text, text) to authenticated;
+
+create view public.employee_payment_totals
+with (security_invoker = true)
+as
+select
+  employee_id,
+  coalesce(sum(amount) filter (
+    where paid_at >= date_trunc('month', now())
+  ), 0) as paid_this_month,
+  coalesce(sum(amount) filter (
+    where paid_at >= date_trunc('year', now())
+  ), 0) as paid_this_year,
+  coalesce(sum(amount), 0) as paid_lifetime
+from public.employee_payments
+group by employee_id;
 
 -- Exactly one simultaneous caller can change an open row. Every later caller receives
 -- no row and therefore `claimed = false`.
