@@ -39,19 +39,19 @@ const seedEmployees: EmployeeProfile[] = [
   { id: "employee-maria", language: "English", name: "Maria Rodriguez",
     email: "maria@example.com", phone: "(602) 555-0142", paymentMethod: "Zelle",
     paymentContact: "(602) 555-0142", serviceArea: "Scottsdale, Paradise Valley",
-    emergencyContact: "Elena Rodriguez · (602) 555-0199", joinedAt: "2025-10-12T12:00:00Z",
+    emergencyContact: "Elena Rodriguez · (602) 555-0199", joinedAt: "2025-10-12T12:00:00Z", active: true,
     standing: "good", score: 94, standingNote: "Strong attendance and consistently positive feedback.",
     completedJobs: 48, attendanceRate: 98, paidMonth: 720, paidYear: 6840, paidLifetime: 9320 },
   { id: "employee-jasmine", language: "English", name: "Jasmine Lee",
     email: "jasmine@example.com", phone: "(480) 555-0168", paymentMethod: "ACH",
     paymentContact: "Secure payout account connected", serviceArea: "Phoenix, Tempe",
-    emergencyContact: "", joinedAt: "2026-01-08T12:00:00Z", standing: "watch", score: 72,
+    emergencyContact: "", joinedAt: "2026-01-08T12:00:00Z", active: false, standing: "watch", score: 72,
     standingNote: "Two recent late arrivals; owner follow-up recommended.",
     completedJobs: 21, attendanceRate: 86, paidMonth: 450, paidYear: 3380, paidLifetime: 3380 },
   { id: "employee-sofia", language: "Español", name: "Sofia Martinez",
     email: "sofia@example.com", phone: "(623) 555-0115", paymentMethod: "Zelle",
     paymentContact: "sofia@example.com", serviceArea: "Glendale, Phoenix",
-    emergencyContact: "", joinedAt: "2026-06-20T12:00:00Z", standing: "new", score: null,
+    emergencyContact: "", joinedAt: "2026-06-20T12:00:00Z", active: true, standing: "new", score: null,
     standingNote: "Not enough work history to calculate a standing.",
     completedJobs: 1, attendanceRate: null, paidMonth: 95, paidYear: 95, paidLifetime: 95 },
 ];
@@ -86,7 +86,12 @@ export default function Home() {
   useEffect(() => { localStorage.setItem("dhc-demo-blocks", JSON.stringify(blocks)); }, [blocks]);
   useEffect(() => {
     const saved = localStorage.getItem("dhc-demo-employees");
-    if (saved) queueMicrotask(() => setEmployees(JSON.parse(saved)));
+    if (saved) {
+      const parsed = JSON.parse(saved) as Array<EmployeeProfile & { active?: boolean }>;
+      queueMicrotask(() => setEmployees(parsed.map((employee) => ({
+        ...employee, active: employee.active ?? true,
+      }))));
+    }
     if (!localStorage.getItem("dhc-demo-onboarded")) queueMicrotask(() => setShowRegistration(true));
   }, []);
   useEffect(() => { localStorage.setItem("dhc-demo-employees", JSON.stringify(employees)); }, [employees]);
@@ -132,6 +137,11 @@ export default function Home() {
     setShowRegistration(false);
     notify("Registration complete. Welcome to the team!");
   }
+  function setEmployeeActive(id: string, active: boolean) {
+    setEmployees((current) => current.map((employee) =>
+      employee.id === id ? { ...employee, active } : employee));
+    notify(active ? "Employee account reactivated." : "Employee account deactivated.");
+  }
 
   return (
     <main>
@@ -152,7 +162,8 @@ export default function Home() {
         ? <EmployeeRegistration onComplete={completeRegistration} onCancel={() => setShowRegistration(false)} />
         : <EmployeeView blocks={shown} availableCount={available.length} tab={tab} setTab={setTab} claim={claim} />)
         : <OwnerView blocks={blocks} employees={employees} alerts={ownerAlerts}
-          onCreate={() => setShowForm(true)} onUnassign={unassignBlock} />}
+          onCreate={() => setShowForm(true)} onUnassign={unassignBlock}
+          onSetEmployeeActive={setEmployeeActive} />}
       {showForm && <CreateBlock onClose={() => setShowForm(false)} onCreate={createBlock} />}
       {toast && <div className="toast"><span>✓</span>{toast}</div>}
     </main>
@@ -207,9 +218,10 @@ function JobCard({ block, onClaim }: { block: WorkBlock; onClaim: (id: string) =
   </article>;
 }
 
-function OwnerView({ blocks, employees, alerts, onCreate, onUnassign }: {
+function OwnerView({ blocks, employees, alerts, onCreate, onUnassign, onSetEmployeeActive }: {
   blocks: WorkBlock[]; employees: EmployeeProfile[]; alerts: string[];
   onCreate: () => void; onUnassign: (id: string) => void;
+  onSetEmployeeActive: (id: string, active: boolean) => void;
 }) {
   const [section, setSection] = useState<"work" | "employees">("work");
   return <section className="page">
@@ -219,7 +231,7 @@ function OwnerView({ blocks, employees, alerts, onCreate, onUnassign }: {
         Employees <span>{employees.length}</span></button>
     </nav>
     {section === "employees"
-      ? <EmployeeDirectory employees={employees} />
+      ? <EmployeeDirectory employees={employees} onSetActive={onSetEmployeeActive} />
       : <OwnerWorkBoard blocks={blocks} alerts={alerts} onCreate={onCreate} onUnassign={onUnassign} />}
   </section>;
 }

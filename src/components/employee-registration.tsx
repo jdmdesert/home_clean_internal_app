@@ -15,6 +15,7 @@ export type EmployeeProfile = {
   serviceArea: string;
   emergencyContact: string;
   joinedAt: string;
+  active: boolean;
   standing: EmployeeStanding;
   score: number | null;
   standingNote: string;
@@ -59,7 +60,7 @@ export function EmployeeRegistration({ onComplete, onCancel }: {
       email: String(data.get("email")), phone: String(data.get("phone")),
       paymentMethod: method, paymentContact: String(data.get("paymentContact")),
       serviceArea: String(data.get("serviceArea")), emergencyContact: String(data.get("emergencyContact")),
-      joinedAt: new Date().toISOString(), standing: "new", score: null,
+      joinedAt: new Date().toISOString(), active: true, standing: "new", score: null,
       standingNote: "Not enough work history to calculate a standing.",
       completedJobs: 0, attendanceRate: null, paidMonth: 0, paidYear: 0, paidLifetime: 0,
     });
