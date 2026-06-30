@@ -36,19 +36,22 @@ const seedBlocks: WorkBlock[] = [
 ];
 
 const seedEmployees: EmployeeProfile[] = [
-  { id: "employee-maria", language: "English", name: "Maria Rodriguez",
+  { id: "employee-maria", language: "English", firstName: "Maria", lastName: "Rodriguez",
+    name: "Maria Rodriguez", dateOfBirth: "1991-04-18",
     email: "maria@example.com", phone: "(602) 555-0142", paymentMethod: "Zelle",
     paymentContact: "(602) 555-0142", serviceArea: "Scottsdale, Paradise Valley",
     emergencyContact: "Elena Rodriguez · (602) 555-0199", joinedAt: "2025-10-12T12:00:00Z", active: true,
     standing: "good", score: 94, standingNote: "Strong attendance and consistently positive feedback.",
     completedJobs: 48, attendanceRate: 98, paidMonth: 720, paidYear: 6840, paidLifetime: 9320 },
-  { id: "employee-jasmine", language: "English", name: "Jasmine Lee",
+  { id: "employee-jasmine", language: "English", firstName: "Jasmine", lastName: "Lee",
+    name: "Jasmine Lee", dateOfBirth: "1996-09-03",
     email: "jasmine@example.com", phone: "(480) 555-0168", paymentMethod: "ACH",
     paymentContact: "Secure payout account connected", serviceArea: "Phoenix, Tempe",
     emergencyContact: "", joinedAt: "2026-01-08T12:00:00Z", active: false, standing: "watch", score: 72,
     standingNote: "Two recent late arrivals; owner follow-up recommended.",
     completedJobs: 21, attendanceRate: 86, paidMonth: 450, paidYear: 3380, paidLifetime: 3380 },
-  { id: "employee-sofia", language: "Español", name: "Sofia Martinez",
+  { id: "employee-sofia", language: "Español", firstName: "Sofia", lastName: "Martinez",
+    name: "Sofia Martinez", dateOfBirth: "1989-12-11",
     email: "sofia@example.com", phone: "(623) 555-0115", paymentMethod: "Zelle",
     paymentContact: "sofia@example.com", serviceArea: "Glendale, Phoenix",
     emergencyContact: "", joinedAt: "2026-06-20T12:00:00Z", active: true, standing: "new", score: null,
@@ -87,10 +90,16 @@ export default function Home() {
   useEffect(() => {
     const saved = localStorage.getItem("dhc-demo-employees");
     if (saved) {
-      const parsed = JSON.parse(saved) as Array<EmployeeProfile & { active?: boolean }>;
-      queueMicrotask(() => setEmployees(parsed.map((employee) => ({
-        ...employee, active: employee.active ?? true,
-      }))));
+      const parsed = JSON.parse(saved) as Array<EmployeeProfile & {
+        active?: boolean; firstName?: string; lastName?: string; dateOfBirth?: string;
+      }>;
+      queueMicrotask(() => setEmployees(parsed.map((employee) => {
+        const parts = employee.name.trim().split(/\s+/);
+        return { ...employee, active: employee.active ?? true,
+          firstName: employee.firstName || parts[0] || "",
+          lastName: employee.lastName || parts.slice(1).join(" "),
+          dateOfBirth: employee.dateOfBirth || "" };
+      })));
     }
     if (!localStorage.getItem("dhc-demo-onboarded")) queueMicrotask(() => setShowRegistration(true));
   }, []);

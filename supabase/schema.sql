@@ -8,6 +8,9 @@ create type public.employee_standing as enum ('new', 'good', 'watch', 'risk');
 create table public.profiles (
   id uuid primary key references auth.users(id) on delete cascade,
   full_name text not null,
+  first_name text,
+  last_name text,
+  date_of_birth date check (date_of_birth <= current_date),
   role public.user_role not null default 'employee',
   preferred_language text check (preferred_language in ('English', 'Español')),
   phone text,
@@ -21,6 +24,10 @@ create table public.profiles (
   standing_note text,
   active boolean not null default true,
   created_at timestamptz not null default now(),
+  constraint completed_employee_identity check (
+    role <> 'employee' or not onboarding_complete
+    or (first_name is not null and last_name is not null and date_of_birth is not null)
+  ),
   constraint new_employee_score_consistent check (
     (standing = 'new' and performance_score is null) or standing <> 'new'
   )
@@ -161,7 +168,9 @@ create policy "employee reads own payments" on public.employee_payments
 -- Registration stores only a payout preference/contact. Raw ACH account and routing
 -- numbers must be tokenized by a payment provider and never passed to this function.
 create or replace function public.register_employee(
-  full_name_input text,
+  first_name_input text,
+  last_name_input text,
+  date_of_birth_input date,
   language_input text,
   phone_input text,
   payment_method_input public.payment_method,
@@ -175,17 +184,24 @@ as $$
 begin
   if auth.uid() is null then raise exception 'Authentication required'; end if;
   if language_input not in ('English', 'Español') then raise exception 'Unsupported language'; end if;
+  if date_of_birth_input > current_date then raise exception 'Date of birth cannot be in the future'; end if;
 
   insert into public.profiles (
-    id, full_name, role, preferred_language, phone, payment_method, payment_contact,
+    id, full_name, first_name, last_name, date_of_birth, role,
+    preferred_language, phone, payment_method, payment_contact,
     service_area, emergency_contact, onboarding_complete
   ) values (
-    auth.uid(), trim(full_name_input), 'employee', language_input, trim(phone_input),
+    auth.uid(), trim(first_name_input) || ' ' || trim(last_name_input),
+    trim(first_name_input), trim(last_name_input), date_of_birth_input,
+    'employee', language_input, trim(phone_input),
     payment_method_input, trim(payment_contact_input), nullif(trim(service_area_input), ''),
     nullif(trim(emergency_contact_input), ''), true
   )
   on conflict (id) do update set
     full_name = excluded.full_name,
+    first_name = excluded.first_name,
+    last_name = excluded.last_name,
+    date_of_birth = excluded.date_of_birth,
     preferred_language = excluded.preferred_language,
     phone = excluded.phone,
     payment_method = excluded.payment_method,
@@ -198,8 +214,8 @@ begin
 end;
 $$;
 
-revoke all on function public.register_employee(text, text, text, public.payment_method, text, text, text) from public;
-grant execute on function public.register_employee(text, text, text, public.payment_method, text, text, text) to authenticated;
+revoke all on function public.register_employee(text, text, date, text, text, public.payment_method, text, text, text) from public;
+grant execute on function public.register_employee(text, text, date, text, text, public.payment_method, text, text, text) to authenticated;
 
 create or replace function public.set_employee_active(employee_id uuid, active_input boolean)
 returns boolean

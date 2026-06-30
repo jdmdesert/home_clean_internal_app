@@ -82,7 +82,11 @@ function EmployeeDetail({ employee, onBack, onSetActive }: {
     </div>
     <div className="profile-grid">
       <section><h3>Personal information</h3>
-        <dl><dt>Email</dt><dd>{employee.email}</dd><dt>Phone</dt><dd>{employee.phone}</dd>
+        <dl><dt>First name</dt><dd>{employee.firstName}</dd><dt>Last name</dt><dd>{employee.lastName}</dd>
+          <dt>Date of birth</dt><dd>{employee.dateOfBirth
+            ? new Date(`${employee.dateOfBirth}T12:00:00`).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })
+            : "Not provided"}</dd>
+          <dt>Email</dt><dd>{employee.email}</dd><dt>Phone</dt><dd>{employee.phone}</dd>
           <dt>Language</dt><dd>{employee.language}</dd><dt>Preferred service area</dt><dd>{employee.serviceArea || "Not specified"}</dd>
           <dt>Emergency contact</dt><dd>{employee.emergencyContact || "Not provided"}</dd></dl></section>
       <section><h3>Payment</h3>
