@@ -31,6 +31,22 @@ experiences.
 5. Invite employees and set their profiles to `employee`.
 6. Deploy to an HTTPS host such as Vercel.
 
+### Activate owner acceptance emails
+
+The database queues an email to `raarentalsllc@gmail.com` whenever an employee successfully
+claims work.
+
+1. Create a Resend account, verify the sending domain, and create an API key.
+2. Deploy `supabase/functions/send-claim-email`.
+3. Set the Edge Function secrets `RESEND_API_KEY`, `CLAIM_EMAIL_FROM`, and
+   `CLAIM_WEBHOOK_SECRET`.
+4. In Supabase, create a Database Webhook for `INSERT` events on `public.email_outbox`.
+5. Point it to the deployed `send-claim-email` function and add the header
+   `Authorization: Bearer <the same CLAIM_WEBHOOK_SECRET>`.
+
+The email function uses the outbox row ID as an idempotency key, preventing duplicate
+emails if the webhook is retried.
+
 The app currently uses local demo data while production authentication is connected.
 Never put a Supabase service-role key in browser-visible environment variables.
 

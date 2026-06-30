@@ -18,6 +18,7 @@ create table public.work_blocks (
   ends_at timestamptz not null check (ends_at > starts_at),
   city text not null,
   postal_code text not null check (postal_code ~ '^[0-9]{5}$'),
+  square_feet integer not null check (square_feet > 0),
   occupancy public.occupancy_status not null,
   owners_present boolean,
   employee_pay numeric(8,2) not null check (employee_pay > 0),
@@ -40,6 +41,7 @@ create table public.work_blocks (
 create table public.work_block_private_details (
   work_block_id uuid primary key references public.work_blocks(id) on delete cascade,
   address text not null,
+  access_codes text,
   private_notes text,
   created_at timestamptz not null default now()
 );
@@ -53,10 +55,31 @@ create table public.push_subscriptions (
   created_at timestamptz not null default now()
 );
 
+create table public.owner_notifications (
+  id bigint generated always as identity primary key,
+  owner_id uuid not null references public.profiles(id) on delete cascade,
+  work_block_id uuid not null references public.work_blocks(id) on delete cascade,
+  message text not null,
+  read_at timestamptz,
+  created_at timestamptz not null default now()
+);
+
+-- A Database Webhook on INSERT sends these rows to the send-claim-email Edge Function.
+create table public.email_outbox (
+  id bigint generated always as identity primary key,
+  work_block_id uuid not null references public.work_blocks(id) on delete cascade,
+  recipient text not null,
+  subject text not null,
+  body text not null,
+  created_at timestamptz not null default now()
+);
+
 alter table public.profiles enable row level security;
 alter table public.work_blocks enable row level security;
 alter table public.work_block_private_details enable row level security;
 alter table public.push_subscriptions enable row level security;
+alter table public.owner_notifications enable row level security;
+alter table public.email_outbox enable row level security;
 
 create function public.is_owner()
 returns boolean language sql stable security definer set search_path = '' as $$
@@ -91,6 +114,10 @@ create policy "assigned employee reads private work details" on public.work_bloc
   );
 create policy "users manage own push subscription" on public.push_subscriptions
   for all to authenticated using (user_id = auth.uid()) with check (user_id = auth.uid());
+create policy "owner reads own notifications" on public.owner_notifications
+  for select to authenticated using (owner_id = auth.uid() and public.is_owner());
+create policy "owner reads email outbox" on public.email_outbox
+  for select to authenticated using (public.is_owner());
 
 -- Exactly one simultaneous caller can change an open row. Every later caller receives
 -- no row and therefore `claimed = false`.
@@ -98,7 +125,11 @@ create or replace function public.claim_work_block(block_id uuid)
 returns table (claimed boolean, work_block_id uuid)
 language plpgsql security definer set search_path = ''
 as $$
-declare won_id uuid;
+declare
+  won_id uuid;
+  block_title text;
+  employee_name text;
+  owner_message text;
 begin
   if not exists (
     select 1 from public.profiles
@@ -111,6 +142,25 @@ begin
   set status = 'claimed', claimed_by = auth.uid(), claimed_at = now()
   where id = block_id and status = 'open' and claimed_by is null
   returning id into won_id;
+
+  if won_id is not null then
+    select title into block_title from public.work_blocks where id = won_id;
+    select full_name into employee_name from public.profiles where id = auth.uid();
+    owner_message := employee_name || ' accepted ' || block_title || '.';
+
+    insert into public.owner_notifications (owner_id, work_block_id, message)
+    select id, won_id, owner_message
+    from public.profiles
+    where role = 'owner' and active;
+
+    insert into public.email_outbox (work_block_id, recipient, subject, body)
+    values (
+      won_id,
+      'raarentalsllc@gmail.com',
+      'Cleaning work accepted: ' || block_title,
+      owner_message || ' Open the owner dashboard for the full assignment details.'
+    );
+  end if;
 
   return query select won_id is not null, won_id;
 end;
