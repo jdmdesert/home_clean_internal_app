@@ -6,7 +6,8 @@ type Role = "owner" | "employee";
 type Status = "open" | "claimed" | "completed";
 type WorkBlock = {
   id: string; title: string; date: string; startTime: string; endTime: string;
-  city: string; zip: string; address: string; pay: number; details: string[]; notes: string;
+  city: string; zip: string; squareFeet: number; address: string; accessCodes: string;
+  pay: number; details: string[]; notes: string;
   occupancy: "vacant" | "occupied"; ownersPresent?: boolean;
   status: Status; claimedBy?: string;
 };
@@ -22,10 +23,12 @@ const jobTemplates: Record<string, string[]> = {
 const seedBlocks: WorkBlock[] = [
   { id: "seed-1", title: "Move-out Cleaning", date: "2026-07-02", startTime: "09:00", endTime: "13:00",
     city: "Scottsdale", zip: "85254", address: "7420 E. Desert Cove Ave, Scottsdale, AZ 85254", pay: 120,
+    squareFeet: 1850, accessCodes: "Gate: #2468 · Front door keypad: 1937",
     details: ["3 bed / 2 bath", "Inside oven", "Inside cabinets"],
     notes: "Lockbox details appear after acceptance.", occupancy: "vacant", status: "open" },
   { id: "seed-2", title: "Airbnb Cleaning", date: "2026-07-03", startTime: "13:30", endTime: "16:30",
     city: "Paradise Valley", zip: "85253", address: "5114 N. Mockingbird Ln, Paradise Valley, AZ 85253", pay: 90,
+    squareFeet: 1420, accessCodes: "Side gate: 5522 · Keypad: 7814",
     details: ["2 bed / 2 bath", "Standard clean", "Pet-friendly products"],
     notes: "One friendly dog will be home.", occupancy: "occupied", ownersPresent: false, status: "open" },
 ];
@@ -44,12 +47,14 @@ export default function Home() {
   const [tab, setTab] = useState<"available" | "mine">("available");
   const [showForm, setShowForm] = useState(false);
   const [toast, setToast] = useState("");
+  const [ownerAlerts, setOwnerAlerts] = useState<string[]>([]);
 
   useEffect(() => {
     const saved = localStorage.getItem("dhc-demo-blocks");
     if (saved) {
       const parsed = JSON.parse(saved) as Array<WorkBlock & { duration?: number; area?: string }>;
-      const compatible = parsed.every((block) => block.endTime && block.city && block.zip && block.occupancy);
+      const compatible = parsed.every((block) =>
+        block.endTime && block.city && block.zip && block.occupancy && block.squareFeet);
       if (compatible) queueMicrotask(() => setBlocks(parsed));
     }
   }, []);
@@ -64,10 +69,17 @@ export default function Home() {
     setTimeout(() => setToast(""), 3500);
   }
   function claim(id: string) {
+    const claimedBlock = blocks.find((block) => block.id === id);
     setBlocks((current) => current.map((block) =>
       block.id === id && block.status === "open"
         ? { ...block, status: "claimed", claimedBy: "Maria" } : block));
     notify("You got it! The address is now unlocked.");
+    if (claimedBlock) {
+      setOwnerAlerts((current) => [
+        `Maria accepted ${claimedBlock.title} in ${claimedBlock.city} for ${day(claimedBlock.date)}.`,
+        ...current,
+      ]);
+    }
     setTab("mine");
   }
   function createBlock(block: WorkBlock) {
@@ -100,7 +112,7 @@ export default function Home() {
       </div>
       {role === "employee"
         ? <EmployeeView blocks={shown} availableCount={available.length} tab={tab} setTab={setTab} claim={claim} />
-        : <OwnerView blocks={blocks} onCreate={() => setShowForm(true)} onUnassign={unassignBlock} />}
+        : <OwnerView blocks={blocks} alerts={ownerAlerts} onCreate={() => setShowForm(true)} onUnassign={unassignBlock} />}
       {showForm && <CreateBlock onClose={() => setShowForm(false)} onCreate={createBlock} />}
       {toast && <div className="toast"><span>✓</span>{toast}</div>}
     </main>
@@ -141,18 +153,22 @@ function JobCard({ block, onClaim }: { block: WorkBlock; onClaim: (id: string) =
         <small>{claimed ? "Full address unlocked" : "Exact address after acceptance"}</small></p>
     </div>
     <div className="occupancy">
+      <span>□ {block.squareFeet.toLocaleString()} sq ft</span>
       <span>{block.occupancy === "vacant" ? "⌂ Vacant home" : "⌂ Occupied home"}</span>
       {block.occupancy === "occupied" &&
         <span>{block.ownersPresent ? "Owners will be present" : "Owners will not be present"}</span>}
     </div>
     <div className="task-list">{block.details.map((detail) => <span key={detail}>✓ {detail}</span>)}</div>
-    {claimed && <p className="notes">{block.notes}</p>}
+    {claimed && <div className="private-details">
+      <b>Property access</b><p>{block.accessCodes || "No gate or keypad code provided."}</p>
+      {block.notes && <><b>Private notes</b><p>{block.notes}</p></>}
+    </div>}
     {!claimed && <button className="primary" onClick={() => onClaim(block.id)}>Accept work block</button>}
   </article>;
 }
 
-function OwnerView({ blocks, onCreate, onUnassign }: {
-  blocks: WorkBlock[]; onCreate: () => void; onUnassign: (id: string) => void;
+function OwnerView({ blocks, alerts, onCreate, onUnassign }: {
+  blocks: WorkBlock[]; alerts: string[]; onCreate: () => void; onUnassign: (id: string) => void;
 }) {
   const counts = useMemo(() => ({
     open: blocks.filter((b) => b.status === "open").length,
@@ -168,13 +184,17 @@ function OwnerView({ blocks, onCreate, onUnassign }: {
       <div><span>Assigned</span><strong>{counts.claimed}</strong><small>Claimed by employees</small></div>
       <div><span>Upcoming pay</span><strong>${counts.payroll}</strong><small>Assigned blocks</small></div>
     </div>
+    {alerts.length > 0 && <div className="owner-alerts">
+      <div><span>✓</span><strong>New acceptance</strong></div>
+      <p>{alerts[0]}</p><small>Owner email recipient: raarentalsllc@gmail.com</small>
+    </div>}
     <div className="owner-list"><div className="list-head"><h2>All work blocks</h2><span>{blocks.length} total</span></div>
       {blocks.map((block) => <article className="owner-row" key={block.id}>
         <div className="date-box"><b>{new Date(`${block.date}T12:00`).toLocaleDateString("en-US", { day: "2-digit" })}</b>
           <span>{new Date(`${block.date}T12:00`).toLocaleDateString("en-US", { month: "short" })}</span></div>
         <div className="row-main"><b>{block.title}</b>
           <span>Arrival {time(block.startTime)} · Departure {time(block.endTime)} · {block.city}, AZ {block.zip}</span>
-          <small>{block.occupancy === "vacant" ? "Vacant" : `Occupied · Owners ${block.ownersPresent ? "present" : "not present"}`}</small>
+          <small>{block.squareFeet.toLocaleString()} sq ft · {block.occupancy === "vacant" ? "Vacant" : `Occupied · Owners ${block.ownersPresent ? "present" : "not present"}`}</small>
         </div>
         <div className="assignee"><span className={`dot ${block.status}`} />{block.claimedBy || "Open to team"}</div>
         <strong className="row-pay">${block.pay}</strong>
@@ -191,7 +211,9 @@ function CreateBlock({ onClose, onCreate }: { onClose: () => void; onCreate: (bl
   const [jobType, setJobType] = useState("Airbnb Cleaning");
   const [tasks, setTasks] = useState(jobTemplates["Airbnb Cleaning"].join("\n"));
   const [occupancy, setOccupancy] = useState<"vacant" | "occupied">("vacant");
-  const [preview, setPreview] = useState({ date: "", start: "", end: "", city: "", zip: "", pay: "" });
+  const [preview, setPreview] = useState({
+    date: "", start: "", end: "", city: "", zip: "", squareFeet: "", pay: "",
+  });
   const [formError, setFormError] = useState("");
 
   function selectTemplate(value: string) {
@@ -211,7 +233,8 @@ function CreateBlock({ onClose, onCreate }: { onClose: () => void; onCreate: (bl
     onCreate({ id: crypto.randomUUID(), title, date: String(data.get("date")),
       startTime: String(data.get("startTime")), endTime: String(data.get("endTime")),
       city: String(data.get("city")), zip: String(data.get("zip")),
-      address: String(data.get("address")), pay: Number(data.get("pay")),
+      squareFeet: Number(data.get("squareFeet")), address: String(data.get("address")),
+      accessCodes: String(data.get("accessCodes")), pay: Number(data.get("pay")),
       details: String(data.get("details")).split("\n").map((item) => item.trim()).filter(Boolean),
       notes: String(data.get("notes")), occupancy,
       ownersPresent: occupancy === "occupied" ? data.get("ownersPresent") === "yes" : undefined,
@@ -227,7 +250,8 @@ function CreateBlock({ onClose, onCreate }: { onClose: () => void; onCreate: (bl
         const data = new FormData(form);
         setPreview({ date: String(data.get("date")), start: String(data.get("startTime")),
           end: String(data.get("endTime")), city: String(data.get("city")),
-          zip: String(data.get("zip")), pay: String(data.get("pay")) });
+          zip: String(data.get("zip")), squareFeet: String(data.get("squareFeet")),
+          pay: String(data.get("pay")) });
       }}>
         <label className="wide">Job type
           <select name="jobType" value={jobType} onChange={(event) => selectTemplate(event.target.value)}>
@@ -242,6 +266,10 @@ function CreateBlock({ onClose, onCreate }: { onClose: () => void; onCreate: (bl
         <label>Latest departure time<input name="endTime" type="time" required /></label>
         <label>City<input name="city" required placeholder="Scottsdale" /></label>
         <label>ZIP code<input name="zip" required inputMode="numeric" pattern="[0-9]{5}" maxLength={5} placeholder="85254" /></label>
+        <label className="wide">Home square footage
+          <input name="squareFeet" type="number" min="1" required placeholder="1850" />
+          <small className="field-note">Shown to employees before they accept.</small>
+        </label>
         <label>Home status
           <select name="occupancy" value={occupancy} onChange={(event) => setOccupancy(event.target.value as "vacant" | "occupied")}>
             <option value="vacant">Vacant</option>
@@ -258,6 +286,10 @@ function CreateBlock({ onClose, onCreate }: { onClose: () => void; onCreate: (bl
           <input name="address" required placeholder="Hidden until an employee accepts" />
           <small className="field-note">Only the assigned employee will see this address.</small>
         </label>
+        <label className="wide">Gate and door access codes
+          <textarea name="accessCodes" rows={2} placeholder="Gate: #2468 · Front door keypad: 1937" />
+          <small className="field-note">Private—shown only after an employee accepts.</small>
+        </label>
         <label className="wide">Cleaning checklist
           <textarea name="details" required rows={5} value={tasks} onChange={(event) => setTasks(event.target.value)} />
           <small className="field-note">One task per line. Templates can be adjusted for each job.</small>
@@ -268,7 +300,7 @@ function CreateBlock({ onClose, onCreate }: { onClose: () => void; onCreate: (bl
           <p>{preview.city || "City"}, AZ {preview.zip || "ZIP"} · {preview.date ? day(preview.date) : "Date"}</p>
           <p>Soonest arrival: {preview.start ? time(preview.start) : "—"}<br />
             Latest departure: {preview.end ? time(preview.end) : "—"} · <strong>${preview.pay || "0"} pay</strong></p>
-          <p>{occupancy === "vacant" ? "Vacant home" : "Occupied home"}</p>
+          <p>{preview.squareFeet ? Number(preview.squareFeet).toLocaleString() : "—"} sq ft · {occupancy === "vacant" ? "Vacant home" : "Occupied home"}</p>
           <small>Full address remains hidden until acceptance.</small>
         </div>
         {formError && <p className="form-error wide">{formError}</p>}
