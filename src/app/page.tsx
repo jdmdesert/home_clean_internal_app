@@ -1,6 +1,8 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import { EmployeeDirectory } from "@/components/employee-directory";
+import { EmployeeRegistration, type EmployeeProfile } from "@/components/employee-registration";
 
 type Role = "owner" | "employee";
 type Status = "open" | "claimed" | "completed";
@@ -33,6 +35,27 @@ const seedBlocks: WorkBlock[] = [
     notes: "One friendly dog will be home.", occupancy: "occupied", ownersPresent: false, status: "open" },
 ];
 
+const seedEmployees: EmployeeProfile[] = [
+  { id: "employee-maria", language: "English", name: "Maria Rodriguez",
+    email: "maria@example.com", phone: "(602) 555-0142", paymentMethod: "Zelle",
+    paymentContact: "(602) 555-0142", serviceArea: "Scottsdale, Paradise Valley",
+    emergencyContact: "Elena Rodriguez · (602) 555-0199", joinedAt: "2025-10-12T12:00:00Z",
+    standing: "good", score: 94, standingNote: "Strong attendance and consistently positive feedback.",
+    completedJobs: 48, attendanceRate: 98, paidMonth: 720, paidYear: 6840, paidLifetime: 9320 },
+  { id: "employee-jasmine", language: "English", name: "Jasmine Lee",
+    email: "jasmine@example.com", phone: "(480) 555-0168", paymentMethod: "ACH",
+    paymentContact: "Secure payout account connected", serviceArea: "Phoenix, Tempe",
+    emergencyContact: "", joinedAt: "2026-01-08T12:00:00Z", standing: "watch", score: 72,
+    standingNote: "Two recent late arrivals; owner follow-up recommended.",
+    completedJobs: 21, attendanceRate: 86, paidMonth: 450, paidYear: 3380, paidLifetime: 3380 },
+  { id: "employee-sofia", language: "Español", name: "Sofia Martinez",
+    email: "sofia@example.com", phone: "(623) 555-0115", paymentMethod: "Zelle",
+    paymentContact: "sofia@example.com", serviceArea: "Glendale, Phoenix",
+    emergencyContact: "", joinedAt: "2026-06-20T12:00:00Z", standing: "new", score: null,
+    standingNote: "Not enough work history to calculate a standing.",
+    completedJobs: 1, attendanceRate: null, paidMonth: 95, paidYear: 95, paidLifetime: 95 },
+];
+
 const day = (value: string) => new Intl.DateTimeFormat("en-US",
   { weekday: "short", month: "short", day: "numeric" }).format(new Date(`${value}T12:00:00`));
 const time = (value: string) => {
@@ -48,6 +71,8 @@ export default function Home() {
   const [showForm, setShowForm] = useState(false);
   const [toast, setToast] = useState("");
   const [ownerAlerts, setOwnerAlerts] = useState<string[]>([]);
+  const [employees, setEmployees] = useState<EmployeeProfile[]>(seedEmployees);
+  const [showRegistration, setShowRegistration] = useState(false);
 
   useEffect(() => {
     const saved = localStorage.getItem("dhc-demo-blocks");
@@ -59,6 +84,12 @@ export default function Home() {
     }
   }, []);
   useEffect(() => { localStorage.setItem("dhc-demo-blocks", JSON.stringify(blocks)); }, [blocks]);
+  useEffect(() => {
+    const saved = localStorage.getItem("dhc-demo-employees");
+    if (saved) queueMicrotask(() => setEmployees(JSON.parse(saved)));
+    if (!localStorage.getItem("dhc-demo-onboarded")) queueMicrotask(() => setShowRegistration(true));
+  }, []);
+  useEffect(() => { localStorage.setItem("dhc-demo-employees", JSON.stringify(employees)); }, [employees]);
 
   const available = blocks.filter((block) => block.status === "open");
   const mine = blocks.filter((block) => block.claimedBy === "Maria");
@@ -95,6 +126,12 @@ export default function Home() {
       item.id === id ? { ...item, status: "open", claimedBy: undefined } : item));
     notify("Assignment removed. The work block is available again.");
   }
+  function completeRegistration(employee: EmployeeProfile) {
+    setEmployees((current) => [employee, ...current]);
+    localStorage.setItem("dhc-demo-onboarded", "true");
+    setShowRegistration(false);
+    notify("Registration complete. Welcome to the team!");
+  }
 
   return (
     <main>
@@ -109,10 +146,13 @@ export default function Home() {
           <button className={role === "employee" ? "active" : ""} onClick={() => setRole("employee")}>Employee</button>
           <button className={role === "owner" ? "active" : ""} onClick={() => setRole("owner")}>Owner</button>
         </div>
+        {role === "employee" && <button className="signup-preview" onClick={() => setShowRegistration(true)}>Preview registration</button>}
       </div>
-      {role === "employee"
-        ? <EmployeeView blocks={shown} availableCount={available.length} tab={tab} setTab={setTab} claim={claim} />
-        : <OwnerView blocks={blocks} alerts={ownerAlerts} onCreate={() => setShowForm(true)} onUnassign={unassignBlock} />}
+      {role === "employee" ? (showRegistration
+        ? <EmployeeRegistration onComplete={completeRegistration} onCancel={() => setShowRegistration(false)} />
+        : <EmployeeView blocks={shown} availableCount={available.length} tab={tab} setTab={setTab} claim={claim} />)
+        : <OwnerView blocks={blocks} employees={employees} alerts={ownerAlerts}
+          onCreate={() => setShowForm(true)} onUnassign={unassignBlock} />}
       {showForm && <CreateBlock onClose={() => setShowForm(false)} onCreate={createBlock} />}
       {toast && <div className="toast"><span>✓</span>{toast}</div>}
     </main>
@@ -167,7 +207,24 @@ function JobCard({ block, onClaim }: { block: WorkBlock; onClaim: (id: string) =
   </article>;
 }
 
-function OwnerView({ blocks, alerts, onCreate, onUnassign }: {
+function OwnerView({ blocks, employees, alerts, onCreate, onUnassign }: {
+  blocks: WorkBlock[]; employees: EmployeeProfile[]; alerts: string[];
+  onCreate: () => void; onUnassign: (id: string) => void;
+}) {
+  const [section, setSection] = useState<"work" | "employees">("work");
+  return <section className="page">
+    <nav className="owner-nav">
+      <button className={section === "work" ? "active" : ""} onClick={() => setSection("work")}>Work board</button>
+      <button className={section === "employees" ? "active" : ""} onClick={() => setSection("employees")}>
+        Employees <span>{employees.length}</span></button>
+    </nav>
+    {section === "employees"
+      ? <EmployeeDirectory employees={employees} />
+      : <OwnerWorkBoard blocks={blocks} alerts={alerts} onCreate={onCreate} onUnassign={onUnassign} />}
+  </section>;
+}
+
+function OwnerWorkBoard({ blocks, alerts, onCreate, onUnassign }: {
   blocks: WorkBlock[]; alerts: string[]; onCreate: () => void; onUnassign: (id: string) => void;
 }) {
   const counts = useMemo(() => ({
@@ -175,7 +232,7 @@ function OwnerView({ blocks, alerts, onCreate, onUnassign }: {
     claimed: blocks.filter((b) => b.status === "claimed").length,
     payroll: blocks.filter((b) => b.status === "claimed").reduce((sum, b) => sum + b.pay, 0),
   }), [blocks]);
-  return <section className="page">
+  return <>
     <div className="owner-heading"><div><p className="eyebrow">OWNER DASHBOARD</p><h1>Work board</h1>
       <p>Post work and see who claimed it.</p></div>
       <button className="primary compact" onClick={onCreate}>＋ Post new work</button></div>
@@ -204,7 +261,7 @@ function OwnerView({ blocks, alerts, onCreate, onUnassign }: {
         </div>
       </article>)}
     </div>
-  </section>;
+  </>;
 }
 
 function CreateBlock({ onClose, onCreate }: { onClose: () => void; onCreate: (block: WorkBlock) => void }) {
