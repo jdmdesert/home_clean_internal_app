@@ -167,6 +167,8 @@ create policy "owner creates work" on public.work_blocks
   for insert to authenticated with check (public.is_owner() and created_by = auth.uid());
 create policy "owner updates work" on public.work_blocks
   for update to authenticated using (public.is_owner()) with check (public.is_owner());
+create policy "owner deletes work" on public.work_blocks
+  for delete to authenticated using (public.is_owner());
 create policy "owner manages private work details" on public.work_block_private_details
   for all to authenticated using (public.is_owner()) with check (public.is_owner());
 create policy "assigned employee reads private work details" on public.work_block_private_details

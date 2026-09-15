@@ -104,6 +104,7 @@ export default function Home() {
   const [blocks, setBlocks] = useState<WorkBlock[]>(seedBlocks);
   const [tab, setTab] = useState<"available" | "mine">("available");
   const [showForm, setShowForm] = useState(false);
+  const [editingBlock, setEditingBlock] = useState<WorkBlock | null>(null);
   const [toast, setToast] = useState("");
   const [ownerAlerts, setOwnerAlerts] = useState<string[]>([]);
   const [employees, setEmployees] = useState<EmployeeProfile[]>(seedEmployees);
@@ -313,6 +314,60 @@ export default function Home() {
       item.id === id ? { ...item, status: "open", claimedBy: undefined } : item));
     notify("Assignment removed. The work block is available again.");
   }
+  async function updateBlock(block: WorkBlock) {
+    if (supabase && session) {
+      const startsAt = new Date(`${block.date}T${block.startTime}:00`).toISOString();
+      const endsAt = new Date(`${block.date}T${block.endTime}:00`).toISOString();
+      const { error } = await supabase.from("work_blocks").update({
+        title: block.title, starts_at: startsAt, ends_at: endsAt, city: block.city,
+        postal_code: block.zip, square_feet: block.squareFeet, occupancy: block.occupancy,
+        owners_present: block.occupancy === "occupied" ? Boolean(block.ownersPresent) : null,
+        employee_pay: block.pay, tasks: block.details,
+      }).eq("id", block.id);
+      if (error) return notify(error.message);
+      const { error: privateError } = await supabase.from("work_block_private_details").update({
+        address: block.address, access_codes: block.accessCodes || null,
+        private_notes: block.notes || null,
+      }).eq("work_block_id", block.id);
+      if (privateError) return notify(privateError.message);
+      setEditingBlock(null);
+      notify("Work block updated.");
+      await loadProductionData(session);
+      return;
+    }
+    setBlocks((current) => current.map((item) => item.id === block.id ? block : item));
+    setEditingBlock(null);
+    notify("Work block updated.");
+  }
+  async function assignBlock(id: string, employeeId: string) {
+    const employee = employees.find((item) => item.id === employeeId);
+    if (!employee) return;
+    if (supabase && session) {
+      const { error } = await supabase.from("work_blocks").update({
+        status: "claimed", claimed_by: employeeId, claimed_at: new Date().toISOString(),
+      }).eq("id", id);
+      if (error) return notify(error.message);
+      notify(`Assigned to ${employee.name}.`);
+      await loadProductionData(session);
+      return;
+    }
+    setBlocks((current) => current.map((item) => item.id === id
+      ? { ...item, status: "claimed", claimedBy: employee.name } : item));
+    notify(`Assigned to ${employee.name}.`);
+  }
+  async function deleteBlock(id: string) {
+    const block = blocks.find((item) => item.id === id);
+    if (!block || !window.confirm(`Delete ${block.title}? This cannot be undone.`)) return;
+    if (supabase && session) {
+      const { error } = await supabase.from("work_blocks").delete().eq("id", id);
+      if (error) return notify(error.message);
+      notify("Work block deleted.");
+      await loadProductionData(session);
+      return;
+    }
+    setBlocks((current) => current.filter((item) => item.id !== id));
+    notify("Work block deleted.");
+  }
   function completeRegistration(employee: EmployeeProfile) {
     setEmployees((current) => [employee, ...current]);
     localStorage.setItem("dhc-demo-onboarded", "true");
@@ -362,9 +417,12 @@ export default function Home() {
         ? <EmployeeRegistration onComplete={completeRegistration} onCancel={() => setShowRegistration(false)} />
         : <EmployeeView blocks={shown} availableCount={available.length} tab={tab} setTab={setTab} claim={claim} />)
         : <OwnerView blocks={blocks} employees={employees} alerts={ownerAlerts}
-          onCreate={() => setShowForm(true)} onUnassign={unassignBlock}
+          onCreate={() => setShowForm(true)} onEdit={setEditingBlock} onDelete={deleteBlock}
+          onAssign={assignBlock} onUnassign={unassignBlock}
           onSetEmployeeActive={setEmployeeActive} />}
       {showForm && <CreateBlock onClose={() => setShowForm(false)} onCreate={createBlock} />}
+      {editingBlock && <CreateBlock key={editingBlock.id} initialBlock={editingBlock}
+        onClose={() => setEditingBlock(null)} onCreate={updateBlock} />}
       {toast && <div className="toast"><span>✓</span>{toast}</div>}
     </main>
   );
@@ -505,9 +563,10 @@ function JobCard({ block, onClaim }: { block: WorkBlock; onClaim: (id: string) =
   </article>;
 }
 
-function OwnerView({ blocks, employees, alerts, onCreate, onUnassign, onSetEmployeeActive }: {
+function OwnerView({ blocks, employees, alerts, onCreate, onEdit, onDelete, onAssign, onUnassign, onSetEmployeeActive }: {
   blocks: WorkBlock[]; employees: EmployeeProfile[]; alerts: string[];
-  onCreate: () => void; onUnassign: (id: string) => void;
+  onCreate: () => void; onEdit: (block: WorkBlock) => void; onDelete: (id: string) => void;
+  onAssign: (id: string, employeeId: string) => void; onUnassign: (id: string) => void;
   onSetEmployeeActive: (id: string, active: boolean) => void;
 }) {
   const [section, setSection] = useState<"work" | "employees">("work");
@@ -519,12 +578,15 @@ function OwnerView({ blocks, employees, alerts, onCreate, onUnassign, onSetEmplo
     </nav>
     {section === "employees"
       ? <EmployeeDirectory employees={employees} onSetActive={onSetEmployeeActive} />
-      : <OwnerWorkBoard blocks={blocks} alerts={alerts} onCreate={onCreate} onUnassign={onUnassign} />}
+      : <OwnerWorkBoard blocks={blocks} employees={employees} alerts={alerts} onCreate={onCreate}
+          onEdit={onEdit} onDelete={onDelete} onAssign={onAssign} onUnassign={onUnassign} />}
   </section>;
 }
 
-function OwnerWorkBoard({ blocks, alerts, onCreate, onUnassign }: {
-  blocks: WorkBlock[]; alerts: string[]; onCreate: () => void; onUnassign: (id: string) => void;
+function OwnerWorkBoard({ blocks, employees, alerts, onCreate, onEdit, onDelete, onAssign, onUnassign }: {
+  blocks: WorkBlock[]; employees: EmployeeProfile[]; alerts: string[]; onCreate: () => void;
+  onEdit: (block: WorkBlock) => void; onDelete: (id: string) => void;
+  onAssign: (id: string, employeeId: string) => void; onUnassign: (id: string) => void;
 }) {
   const counts = useMemo(() => ({
     open: blocks.filter((b) => b.status === "open").length,
@@ -554,21 +616,42 @@ function OwnerWorkBoard({ blocks, alerts, onCreate, onUnassign }: {
         </div>
         <div className="assignee"><span className={`dot ${block.status}`} />{block.claimedBy || "Open to team"}</div>
         <strong className="row-pay">${block.pay}</strong>
-        <div className="row-actions">{block.claimedBy
-          ? <button className="unassign" onClick={() => onUnassign(block.id)}>Remove assignment</button>
-          : <span>—</span>}
+        <div className="row-actions">
+          {!block.claimedBy && <AssignEmployee blockId={block.id} employees={employees} onAssign={onAssign} />}
+          {block.claimedBy && <button className="unassign" onClick={() => onUnassign(block.id)}>Unassign</button>}
+          <button className="row-edit" onClick={() => onEdit(block)}>Edit</button>
+          <button className="row-delete" onClick={() => onDelete(block.id)}>Delete</button>
         </div>
       </article>)}
     </div>
   </>;
 }
 
-function CreateBlock({ onClose, onCreate }: { onClose: () => void; onCreate: (block: WorkBlock) => void }) {
-  const [jobType, setJobType] = useState("Airbnb Cleaning");
-  const [tasks, setTasks] = useState(jobTemplates["Airbnb Cleaning"].join("\n"));
-  const [occupancy, setOccupancy] = useState<"vacant" | "occupied">("vacant");
+function AssignEmployee({ blockId, employees, onAssign }: {
+  blockId: string; employees: EmployeeProfile[]; onAssign: (id: string, employeeId: string) => void;
+}) {
+  const activeEmployees = employees.filter((employee) => employee.active);
+  const [employeeId, setEmployeeId] = useState(activeEmployees[0]?.id || "");
+  if (!activeEmployees.length) return <small>No active employees</small>;
+  return <span className="assign-control">
+    <select aria-label="Employee" value={employeeId} onChange={(event) => setEmployeeId(event.target.value)}>
+      {activeEmployees.map((employee) => <option value={employee.id} key={employee.id}>{employee.name}</option>)}
+    </select>
+    <button onClick={() => onAssign(blockId, employeeId)}>Assign</button>
+  </span>;
+}
+
+function CreateBlock({ onClose, onCreate, initialBlock }: {
+  onClose: () => void; onCreate: (block: WorkBlock) => void; initialBlock?: WorkBlock;
+}) {
+  const initialType = initialBlock && jobTemplates[initialBlock.title] ? initialBlock.title : initialBlock ? "Custom Job" : "Airbnb Cleaning";
+  const [jobType, setJobType] = useState(initialType);
+  const [tasks, setTasks] = useState(initialBlock?.details.join("\n") || jobTemplates["Airbnb Cleaning"].join("\n"));
+  const [occupancy, setOccupancy] = useState<"vacant" | "occupied">(initialBlock?.occupancy || "vacant");
   const [preview, setPreview] = useState({
-    date: "", start: "", end: "", city: "", zip: "", squareFeet: "", pay: "",
+    date: initialBlock?.date || "", start: initialBlock?.startTime || "", end: initialBlock?.endTime || "",
+    city: initialBlock?.city || "", zip: initialBlock?.zip || "",
+    squareFeet: String(initialBlock?.squareFeet || ""), pay: String(initialBlock?.pay || ""),
   });
   const [formError, setFormError] = useState("");
 
@@ -586,7 +669,7 @@ function CreateBlock({ onClose, onCreate }: { onClose: () => void; onCreate: (bl
     }
     setFormError("");
     const title = jobType === "Custom Job" ? String(data.get("customTitle")) : jobType;
-    onCreate({ id: crypto.randomUUID(), title, date: String(data.get("date")),
+    onCreate({ id: initialBlock?.id || crypto.randomUUID(), title, date: String(data.get("date")),
       startTime: String(data.get("startTime")), endTime: String(data.get("endTime")),
       city: String(data.get("city")), zip: String(data.get("zip")),
       squareFeet: Number(data.get("squareFeet")), address: String(data.get("address")),
@@ -594,13 +677,14 @@ function CreateBlock({ onClose, onCreate }: { onClose: () => void; onCreate: (bl
       details: String(data.get("details")).split("\n").map((item) => item.trim()).filter(Boolean),
       notes: String(data.get("notes")), occupancy,
       ownersPresent: occupancy === "occupied" ? data.get("ownersPresent") === "yes" : undefined,
-      status: "open" });
+      status: initialBlock?.status || "open", claimedBy: initialBlock?.claimedBy });
   }
   return <div className="modal-backdrop" onMouseDown={onClose}>
     <div className="modal" onMouseDown={(e) => e.stopPropagation()}>
       <button className="close" onClick={onClose}>×</button>
-      <p className="eyebrow">NEW WORK BLOCK</p><h2>Post work to your team</h2>
-      <p className="form-intro">Choose a template, confirm the details, and post it to the team.</p>
+      <p className="eyebrow">{initialBlock ? "EDIT WORK BLOCK" : "NEW WORK BLOCK"}</p>
+      <h2>{initialBlock ? "Update work details" : "Post work to your team"}</h2>
+      <p className="form-intro">Choose a template, confirm the details, and {initialBlock ? "save your changes" : "post it to the team"}.</p>
       <form onSubmit={submit} onChange={(event) => {
         const form = event.currentTarget;
         const data = new FormData(form);
@@ -615,15 +699,15 @@ function CreateBlock({ onClose, onCreate }: { onClose: () => void; onCreate: (bl
           </select>
         </label>
         {jobType === "Custom Job" && <label className="wide">Custom job name
-          <input name="customTitle" required placeholder="Enter the job type" /></label>}
-        <label>Date<input name="date" type="date" required /></label>
-        <label>Employee pay ($)<input name="pay" type="number" min="1" required placeholder="110" /></label>
-        <label>Soonest arrival time<input name="startTime" type="time" required /></label>
-        <label>Latest departure time<input name="endTime" type="time" required /></label>
-        <label>City<input name="city" required placeholder="Scottsdale" /></label>
-        <label>ZIP code<input name="zip" required inputMode="numeric" pattern="[0-9]{5}" maxLength={5} placeholder="85254" /></label>
+          <input name="customTitle" required defaultValue={initialType === "Custom Job" ? initialBlock?.title : ""} placeholder="Enter the job type" /></label>}
+        <label>Date<input name="date" type="date" required defaultValue={initialBlock?.date} /></label>
+        <label>Employee pay ($)<input name="pay" type="number" min="1" required defaultValue={initialBlock?.pay} placeholder="110" /></label>
+        <label>Soonest arrival time<input name="startTime" type="time" required defaultValue={initialBlock?.startTime} /></label>
+        <label>Latest departure time<input name="endTime" type="time" required defaultValue={initialBlock?.endTime} /></label>
+        <label>City<input name="city" required defaultValue={initialBlock?.city} placeholder="Scottsdale" /></label>
+        <label>ZIP code<input name="zip" required defaultValue={initialBlock?.zip} inputMode="numeric" pattern="[0-9]{5}" maxLength={5} placeholder="85254" /></label>
         <label className="wide">Home square footage
-          <input name="squareFeet" type="number" min="1" required placeholder="1850" />
+          <input name="squareFeet" type="number" min="1" required defaultValue={initialBlock?.squareFeet} placeholder="1850" />
           <small className="field-note">Shown to employees before they accept.</small>
         </label>
         <label>Home status
@@ -633,24 +717,24 @@ function CreateBlock({ onClose, onCreate }: { onClose: () => void; onCreate: (bl
           </select>
         </label>
         {occupancy === "occupied" && <label>Will owners be present?
-          <select name="ownersPresent" defaultValue="yes">
+          <select name="ownersPresent" defaultValue={initialBlock?.ownersPresent === false ? "no" : "yes"}>
             <option value="yes">Yes, owners present</option>
             <option value="no">No, owners not present</option>
           </select>
         </label>}
         <label className="wide">Full street address
-          <input name="address" required placeholder="Hidden until an employee accepts" />
+          <input name="address" required defaultValue={initialBlock?.address} placeholder="Hidden until an employee accepts" />
           <small className="field-note">Only the assigned employee will see this address.</small>
         </label>
         <label className="wide">Gate and door access codes
-          <textarea name="accessCodes" rows={2} placeholder="Gate: #2468 · Front door keypad: 1937" />
+          <textarea name="accessCodes" rows={2} defaultValue={initialBlock?.accessCodes} placeholder="Gate: #2468 · Front door keypad: 1937" />
           <small className="field-note">Private—shown only after an employee accepts.</small>
         </label>
         <label className="wide">Cleaning checklist
           <textarea name="details" required rows={5} value={tasks} onChange={(event) => setTasks(event.target.value)} />
           <small className="field-note">One task per line. Templates can be adjusted for each job.</small>
         </label>
-        <label className="wide">Private job notes<textarea name="notes" rows={2} placeholder="Entry instructions, pets, supplies…" /></label>
+        <label className="wide">Private job notes<textarea name="notes" rows={2} defaultValue={initialBlock?.notes} placeholder="Entry instructions, pets, supplies…" /></label>
         <div className="job-preview wide">
           <span>EMPLOYEE PREVIEW</span><b>{jobType}</b>
           <p>{preview.city || "City"}, AZ {preview.zip || "ZIP"} · {preview.date ? day(preview.date) : "Date"}</p>
@@ -661,7 +745,7 @@ function CreateBlock({ onClose, onCreate }: { onClose: () => void; onCreate: (bl
         </div>
         {formError && <p className="form-error wide">{formError}</p>}
         <div className="form-actions"><button type="button" className="secondary" onClick={onClose}>Cancel</button>
-          <button className="primary">Post work block</button></div>
+          <button className="primary">{initialBlock ? "Save changes" : "Post work block"}</button></div>
       </form>
     </div>
   </div>;
