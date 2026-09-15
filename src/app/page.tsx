@@ -162,14 +162,20 @@ export default function Home() {
   useEffect(() => {
     if (!supabase) return;
     let active = true;
+    const loadingTimer = window.setTimeout(() => {
+      if (active) setLoading(false);
+    }, 8000);
     if (openedFromPasswordRecovery) queueMicrotask(() => {
       if (active) setRecoveringPassword(true);
     });
     supabase.auth.getSession().then(({ data }) => {
       if (!active) return;
+      window.clearTimeout(loadingTimer);
       setSession(data.session);
       if (data.session && !openedFromPasswordRecovery) void loadProductionData(data.session);
       else setLoading(false);
+    }).catch(() => {
+      if (active) setLoading(false);
     });
     const { data: listener } = supabase.auth.onAuthStateChange((event, nextSession) => {
       if (!active) return;
@@ -178,7 +184,11 @@ export default function Home() {
       if (nextSession) void loadProductionData(nextSession);
       else { setAccount(null); setLoading(false); }
     });
-    return () => { active = false; listener.subscription.unsubscribe(); };
+    return () => {
+      active = false;
+      window.clearTimeout(loadingTimer);
+      listener.subscription.unsubscribe();
+    };
   }, []);
 
   useEffect(() => {
