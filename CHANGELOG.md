@@ -52,6 +52,9 @@ All notable changes to the Steadfast & Co. Cleaning Team App are recorded here.
 
 - Added installable PWA support and service-worker registration.
 - Added web-push subscription support and new-job notification infrastructure.
+- Added automatic push delivery to every subscribed active employee device when an owner posts work.
+- Added owner-facing delivery counts and configuration-error feedback after a job is posted.
+- Added persistent “Notifications enabled” status on subscribed employee devices.
 - Added owner acceptance notifications and an email outbox workflow.
 - Added atomic job claiming to prevent two employees from accepting the same job.
 - Added row-level security for owner and employee access.

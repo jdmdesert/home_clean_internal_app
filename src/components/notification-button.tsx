@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 
 function decodeVapidKey(value: string) {
@@ -12,7 +12,16 @@ function decodeVapidKey(value: string) {
 export function NotificationButton() {
   const [message, setMessage] = useState("");
   const [working, setWorking] = useState(false);
+  const [enabled, setEnabled] = useState(false);
   const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+
+  useEffect(() => {
+    if (!("serviceWorker" in navigator) || !("PushManager" in window)) return;
+    navigator.serviceWorker.ready
+      .then((registration) => registration.pushManager.getSubscription())
+      .then((subscription) => setEnabled(Boolean(subscription)))
+      .catch(() => setEnabled(false));
+  }, []);
 
   async function enable() {
     if (!supabase || !publicKey || !("serviceWorker" in navigator) || !("PushManager" in window)) {
@@ -37,6 +46,7 @@ export function NotificationButton() {
         p256dh: json.keys.p256dh, auth: json.keys.auth,
       }, { onConflict: "endpoint" });
       if (error) throw error;
+      setEnabled(true);
       setMessage("Notifications enabled on this device.");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Notifications could not be enabled.");
@@ -44,7 +54,9 @@ export function NotificationButton() {
   }
 
   return <div className="notification-optin">
-    <button className="secondary" onClick={enable} disabled={working}>{working ? "Enabling…" : "Enable notifications"}</button>
+    <button className="secondary" onClick={enable} disabled={working || enabled}>
+      {working ? "Enabling…" : enabled ? "Notifications enabled" : "Enable notifications"}
+    </button>
     {message && <small>{message}</small>}
   </div>;
 }

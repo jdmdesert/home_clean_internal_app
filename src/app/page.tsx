@@ -293,14 +293,23 @@ export default function Home() {
       });
       if (privateError) return notify(`Job created, but private details failed: ${privateError.message}`);
       const { data: authData } = await supabase.auth.getSession();
+      let notificationMessage = "Work block posted to the team.";
       if (authData.session) {
-        await fetch("/api/push/new-job", {
-          method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${authData.session.access_token}` },
-          body: JSON.stringify({ jobId: created.id, title: block.title, area: `${block.city}, AZ`, date: block.date }),
-        });
+        try {
+          const pushResponse = await fetch("/api/push/new-job", {
+            method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${authData.session.access_token}` },
+            body: JSON.stringify({ jobId: created.id, title: block.title, area: `${block.city}, AZ`, date: block.date }),
+          });
+          const pushResult = await pushResponse.json() as { sent?: number; error?: string };
+          notificationMessage = pushResponse.ok
+            ? `Work posted. ${pushResult.sent || 0} employee device${pushResult.sent === 1 ? "" : "s"} notified.`
+            : `Work posted, but push notifications failed: ${pushResult.error || "Service unavailable"}`;
+        } catch {
+          notificationMessage = "Work posted, but the notification service could not be reached.";
+        }
       }
       setShowForm(false);
-      notify("Work block posted to the team.");
+      notify(notificationMessage);
       await loadProductionData(session);
       return;
     }
