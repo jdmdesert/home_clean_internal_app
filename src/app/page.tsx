@@ -325,8 +325,8 @@ export default function Home() {
   return (
     <main>
       <header className="topbar">
-        <div className="brand"><span className="brand-mark">D</span>
-          <span><b>Desert Home</b><small>Cleaning team</small></span></div>
+        <div className="brand"><span className="brand-mark">S&amp;C</span>
+          <span><b>Steadfast &amp; Co.</b><small>Cleaning</small></span></div>
         <button className="avatar" aria-label="Open account menu">{role === "owner" ? "JD" : "MR"}</button>
       </header>
       <div className="demo-bar">
@@ -381,7 +381,7 @@ function LoginScreen() {
     setSubmitting(false);
   }
   return <main className="auth-shell"><section className="auth-card">
-    <div className="brand"><span className="brand-mark">D</span><span><b>Desert Home</b><small>Cleaning team</small></span></div>
+    <div className="brand"><span className="brand-mark">S&amp;C</span><span><b>Steadfast &amp; Co.</b><small>Cleaning</small></span></div>
     {forgotMode ? <>
       <p className="eyebrow">ACCOUNT RECOVERY</p><h1>Reset your password</h1>
       {resetSent ? <div className="auth-success"><b>Check your email</b><p>If an account exists for that address, a password-reset link is on its way.</p></div>
@@ -392,7 +392,7 @@ function LoginScreen() {
           </form></>}
       <button className="auth-link" onClick={() => { setForgotMode(false); setResetSent(false); setError(""); }}>Back to sign in</button>
     </> : <>
-      <p className="eyebrow">PRIVATE WORK BOARD</p><h1>Welcome back</h1>
+      <h1>Welcome back</h1>
       <p>Sign in with the account provided by the owner.</p>
       <form onSubmit={signIn}><label>Email<input name="email" type="email" autoComplete="email" required /></label>
         <label>Password<input name="password" type="password" autoComplete="current-password" required /></label>
@@ -422,7 +422,7 @@ function ResetPasswordScreen({ onDone }: { onDone: () => void }) {
     setSubmitting(false);
   }
   return <main className="auth-shell"><section className="auth-card">
-    <div className="brand"><span className="brand-mark">D</span><span><b>Desert Home</b><small>Cleaning team</small></span></div>
+    <div className="brand"><span className="brand-mark">S&amp;C</span><span><b>Steadfast &amp; Co.</b><small>Cleaning</small></span></div>
     <p className="eyebrow">ACCOUNT RECOVERY</p><h1>Choose a new password</h1>
     <p>Your new password must contain at least eight characters.</p>
     <form onSubmit={updatePassword}>

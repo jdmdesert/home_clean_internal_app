@@ -1,4 +1,4 @@
-# Desert Home Cleaning — Internal Work App
+# Steadfast & Co. Cleaning — Team App
 
 Private, installable work-board PWA for a small cleaning company. Owners post cleaning
 blocks and employees can claim them. The first employee to accept a block gets it.

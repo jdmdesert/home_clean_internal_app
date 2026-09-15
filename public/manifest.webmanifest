@@ -1,7 +1,7 @@
 {
-  "name": "Desert Home Cleaning Work Board",
-  "short_name": "DHC Work",
-  "description": "Private work scheduling for the Desert Home Cleaning team.",
+  "name": "Steadfast & Co. Cleaning Team App",
+  "short_name": "Steadfast",
+  "description": "Work scheduling for the Steadfast & Co. Cleaning team.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#f7f5ef",

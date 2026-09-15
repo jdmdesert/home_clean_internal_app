@@ -2,10 +2,10 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Desert Home Cleaning | Work Board",
-  description: "Private work scheduling for the Desert Home Cleaning team.",
+  title: "Steadfast & Co. Cleaning | Team App",
+  description: "Work scheduling for the Steadfast & Co. Cleaning team.",
   manifest: "/manifest.webmanifest",
-  appleWebApp: { capable: true, statusBarStyle: "black-translucent", title: "DHC Work" },
+  appleWebApp: { capable: true, statusBarStyle: "black-translucent", title: "Steadfast Cleaning" },
 };
 
 export const viewport: Viewport = {
