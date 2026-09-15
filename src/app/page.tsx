@@ -107,6 +107,7 @@ export default function Home() {
   const [account, setAccount] = useState<AccountProfile | null>(null);
   const [loading, setLoading] = useState(isSupabaseConfigured);
   const [appError, setAppError] = useState("");
+  const [recoveringPassword, setRecoveringPassword] = useState(false);
 
   async function loadProductionData(currentSession: Session) {
     if (!supabase) return;
@@ -162,8 +163,9 @@ export default function Home() {
       if (data.session) void loadProductionData(data.session);
       else setLoading(false);
     });
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+    const { data: listener } = supabase.auth.onAuthStateChange((event, nextSession) => {
       if (!active) return;
+      if (event === "PASSWORD_RECOVERY") setRecoveringPassword(true);
       setSession(nextSession);
       if (nextSession) void loadProductionData(nextSession);
       else { setAccount(null); setLoading(false); }
@@ -312,6 +314,7 @@ export default function Home() {
     notify(active ? "Employee account reactivated." : "Employee account deactivated.");
   }
 
+  if (recoveringPassword) return <ResetPasswordScreen onDone={() => setRecoveringPassword(false)} />;
   if (loading) return <div className="auth-shell"><div className="auth-card"><h1>Loading work board…</h1></div></div>;
   if (isSupabaseConfigured && !session) return <LoginScreen />;
   if (isSupabaseConfigured && (!account || appError)) return <div className="auth-shell"><div className="auth-card">
@@ -352,6 +355,8 @@ export default function Home() {
 function LoginScreen() {
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [forgotMode, setForgotMode] = useState(false);
+  const [resetSent, setResetSent] = useState(false);
   async function signIn(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!supabase) return;
@@ -363,14 +368,68 @@ function LoginScreen() {
     if (authError) setError(authError.message);
     setSubmitting(false);
   }
+  async function requestReset(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!supabase) return;
+    setSubmitting(true); setError("");
+    const form = new FormData(event.currentTarget);
+    const { error: resetError } = await supabase.auth.resetPasswordForEmail(String(form.get("email")), {
+      redirectTo: window.location.origin,
+    });
+    if (resetError) setError(resetError.message);
+    else setResetSent(true);
+    setSubmitting(false);
+  }
   return <main className="auth-shell"><section className="auth-card">
     <div className="brand"><span className="brand-mark">D</span><span><b>Desert Home</b><small>Cleaning team</small></span></div>
-    <p className="eyebrow">PRIVATE WORK BOARD</p><h1>Welcome back</h1>
-    <p>Sign in with the account provided by the owner.</p>
-    <form onSubmit={signIn}><label>Email<input name="email" type="email" autoComplete="email" required /></label>
-      <label>Password<input name="password" type="password" autoComplete="current-password" required /></label>
+    {forgotMode ? <>
+      <p className="eyebrow">ACCOUNT RECOVERY</p><h1>Reset your password</h1>
+      {resetSent ? <div className="auth-success"><b>Check your email</b><p>If an account exists for that address, a password-reset link is on its way.</p></div>
+        : <><p>Enter your work email and we’ll send you a secure reset link.</p>
+          <form onSubmit={requestReset}><label>Email<input name="email" type="email" autoComplete="email" required /></label>
+            {error && <p className="form-error">{error}</p>}
+            <button className="primary" disabled={submitting}>{submitting ? "Sending…" : "Send reset link"}</button>
+          </form></>}
+      <button className="auth-link" onClick={() => { setForgotMode(false); setResetSent(false); setError(""); }}>Back to sign in</button>
+    </> : <>
+      <p className="eyebrow">PRIVATE WORK BOARD</p><h1>Welcome back</h1>
+      <p>Sign in with the account provided by the owner.</p>
+      <form onSubmit={signIn}><label>Email<input name="email" type="email" autoComplete="email" required /></label>
+        <label>Password<input name="password" type="password" autoComplete="current-password" required /></label>
+        {error && <p className="form-error">{error}</p>}
+        <button className="primary" disabled={submitting}>{submitting ? "Signing in…" : "Sign in"}</button>
+      </form>
+      <button className="auth-link" onClick={() => { setForgotMode(true); setError(""); }}>Forgot password?</button>
+    </>}
+  </section></main>;
+}
+
+function ResetPasswordScreen({ onDone }: { onDone: () => void }) {
+  const [error, setError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  async function updatePassword(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!supabase) return;
+    const form = new FormData(event.currentTarget);
+    const password = String(form.get("password"));
+    const confirmation = String(form.get("confirmation"));
+    if (password.length < 8) return setError("Use at least 8 characters.");
+    if (password !== confirmation) return setError("The passwords do not match.");
+    setSubmitting(true); setError("");
+    const { error: updateError } = await supabase.auth.updateUser({ password });
+    if (updateError) setError(updateError.message);
+    else onDone();
+    setSubmitting(false);
+  }
+  return <main className="auth-shell"><section className="auth-card">
+    <div className="brand"><span className="brand-mark">D</span><span><b>Desert Home</b><small>Cleaning team</small></span></div>
+    <p className="eyebrow">ACCOUNT RECOVERY</p><h1>Choose a new password</h1>
+    <p>Your new password must contain at least eight characters.</p>
+    <form onSubmit={updatePassword}>
+      <label>New password<input name="password" type="password" autoComplete="new-password" minLength={8} required /></label>
+      <label>Confirm new password<input name="confirmation" type="password" autoComplete="new-password" minLength={8} required /></label>
       {error && <p className="form-error">{error}</p>}
-      <button className="primary" disabled={submitting}>{submitting ? "Signing in…" : "Sign in"}</button>
+      <button className="primary" disabled={submitting}>{submitting ? "Saving…" : "Save new password"}</button>
     </form>
   </section></main>;
 }
