@@ -11,6 +11,8 @@ create table public.profiles (
   first_name text,
   last_name text,
   date_of_birth date check (date_of_birth <= current_date),
+  email text,
+  address text,
   role public.user_role not null default 'employee',
   preferred_language text check (preferred_language in ('English', 'Español')),
   phone text,
@@ -187,6 +189,7 @@ create or replace function public.register_employee(
   date_of_birth_input date,
   language_input text,
   phone_input text,
+  address_input text,
   payment_method_input public.payment_method,
   payment_contact_input text,
   service_area_input text default null,
@@ -202,12 +205,12 @@ begin
 
   insert into public.profiles (
     id, full_name, first_name, last_name, date_of_birth, role,
-    preferred_language, phone, payment_method, payment_contact,
+    preferred_language, phone, address, payment_method, payment_contact,
     service_area, emergency_contact, onboarding_complete
   ) values (
     auth.uid(), trim(first_name_input) || ' ' || trim(last_name_input),
     trim(first_name_input), trim(last_name_input), date_of_birth_input,
-    'employee', language_input, trim(phone_input),
+    'employee', language_input, trim(phone_input), trim(address_input),
     payment_method_input, trim(payment_contact_input), nullif(trim(service_area_input), ''),
     nullif(trim(emergency_contact_input), ''), true
   )
@@ -218,18 +221,20 @@ begin
     date_of_birth = excluded.date_of_birth,
     preferred_language = excluded.preferred_language,
     phone = excluded.phone,
+    address = excluded.address,
     payment_method = excluded.payment_method,
     payment_contact = excluded.payment_contact,
     service_area = excluded.service_area,
     emergency_contact = excluded.emergency_contact,
-    onboarding_complete = true;
+    onboarding_complete = true,
+    active = true;
 
   return auth.uid();
 end;
 $$;
 
-revoke all on function public.register_employee(text, text, date, text, text, public.payment_method, text, text, text) from public;
-grant execute on function public.register_employee(text, text, date, text, text, public.payment_method, text, text, text) to authenticated;
+revoke all on function public.register_employee(text, text, date, text, text, text, public.payment_method, text, text, text) from public;
+grant execute on function public.register_employee(text, text, date, text, text, text, public.payment_method, text, text, text) to authenticated;
 
 create or replace function public.set_employee_active(employee_id uuid, active_input boolean)
 returns boolean

@@ -73,6 +73,24 @@ emails if the webhook is retried.
 The app uses local demo data only when Supabase environment variables are absent.
 Never put a Supabase service-role key in browser-visible environment variables.
 
+## Employee invitations
+
+Owners can invite an employee from **Employees → Invite employee** using only a name and
+email address. Before using invitations in production:
+
+1. Run [`supabase/employee_invitation_upgrade.sql`](supabase/employee_invitation_upgrade.sql)
+   once in the Supabase SQL Editor.
+2. In Supabase, open **Authentication → Email Templates → Invite user**. Set the subject
+   to the contents of [`supabase/email-templates/invite-subject.txt`](supabase/email-templates/invite-subject.txt)
+   and the body to [`supabase/email-templates/invite.html`](supabase/email-templates/invite.html).
+3. In Netlify, set `NEXT_PUBLIC_SITE_URL=https://steadfast-cleaning.netlify.app`,
+   `SUPABASE_URL`, and the server-only `SUPABASE_SERVICE_ROLE_KEY`, then redeploy.
+4. Keep `https://steadfast-cleaning.netlify.app/**` in the Supabase authentication redirect allow list.
+
+The iOS and Android email buttons use the same secure, single-use Supabase invitation.
+After opening it, the employee creates a password, completes their profile, installs the
+PWA using their browser, and enables notifications on that device.
+
 ## Security model
 
 - Employees see only the general area before accepting.

@@ -18,7 +18,7 @@ type WorkBlock = {
   status: Status; claimedBy?: string;
 };
 
-type AccountProfile = { id: string; full_name: string; role: Role; active: boolean };
+type AccountProfile = { id: string; full_name: string; role: Role; active: boolean; onboarding_complete: boolean };
 type WorkBlockRow = {
   id: string; title: string; starts_at: string; ends_at: string; city: string;
   postal_code: string; square_feet: number; occupancy: "vacant" | "occupied";
@@ -66,21 +66,21 @@ const seedBlocks: WorkBlock[] = [
 const seedEmployees: EmployeeProfile[] = [
   { id: "employee-maria", language: "English", firstName: "Maria", lastName: "Rodriguez",
     name: "Maria Rodriguez", dateOfBirth: "1991-04-18",
-    email: "maria@example.com", phone: "(602) 555-0142", paymentMethod: "Zelle",
+    email: "maria@example.com", address: "", phone: "(602) 555-0142", paymentMethod: "Zelle",
     paymentContact: "(602) 555-0142", serviceArea: "Scottsdale, Paradise Valley",
     emergencyContact: "Elena Rodriguez · (602) 555-0199", joinedAt: "2025-10-12T12:00:00Z", active: true,
     standing: "good", score: 94, standingNote: "Strong attendance and consistently positive feedback.",
     completedJobs: 48, attendanceRate: 98, paidMonth: 720, paidYear: 6840, paidLifetime: 9320 },
   { id: "employee-jasmine", language: "English", firstName: "Jasmine", lastName: "Lee",
     name: "Jasmine Lee", dateOfBirth: "1996-09-03",
-    email: "jasmine@example.com", phone: "(480) 555-0168", paymentMethod: "ACH",
+    email: "jasmine@example.com", address: "", phone: "(480) 555-0168", paymentMethod: "ACH",
     paymentContact: "Secure payout account connected", serviceArea: "Phoenix, Tempe",
     emergencyContact: "", joinedAt: "2026-01-08T12:00:00Z", active: false, standing: "watch", score: 72,
     standingNote: "Two recent late arrivals; owner follow-up recommended.",
     completedJobs: 21, attendanceRate: 86, paidMonth: 450, paidYear: 3380, paidLifetime: 3380 },
   { id: "employee-sofia", language: "Español", firstName: "Sofia", lastName: "Martinez",
     name: "Sofia Martinez", dateOfBirth: "1989-12-11",
-    email: "sofia@example.com", phone: "(623) 555-0115", paymentMethod: "Zelle",
+    email: "sofia@example.com", address: "", phone: "(623) 555-0115", paymentMethod: "Zelle",
     paymentContact: "sofia@example.com", serviceArea: "Glendale, Phoenix",
     emergencyContact: "", joinedAt: "2026-06-20T12:00:00Z", active: true, standing: "new", score: null,
     standingNote: "Not enough work history to calculate a standing.",
@@ -128,7 +128,7 @@ export default function Home() {
     if (!supabase) return;
     setAppError("");
     const { data: profile, error: profileError } = await supabase
-      .from("profiles").select("id, full_name, role, active").eq("id", currentSession.user.id).single();
+      .from("profiles").select("id, full_name, role, active, onboarding_complete").eq("id", currentSession.user.id).single();
     if (profileError || !profile) {
       setAppError("This account has not been added to the cleaning team yet.");
       setLoading(false);
@@ -137,6 +137,7 @@ export default function Home() {
     const typedProfile = profile as AccountProfile;
     setAccount(typedProfile);
     setRole(typedProfile.role);
+    if (typedProfile.role === "employee" && !typedProfile.onboarding_complete) setShowRegistration(true);
 
     const { data: profileRows } = typedProfile.role === "owner"
       ? await supabase.from("profiles").select("*").eq("role", "employee").order("full_name")
@@ -155,7 +156,7 @@ export default function Home() {
       setEmployees((profileRows || []).map((item) => ({
         id: item.id, language: item.preferred_language || "English",
         firstName: item.first_name || "", lastName: item.last_name || "", name: item.full_name,
-        dateOfBirth: item.date_of_birth || "", email: "Managed through login", phone: item.phone || "",
+        dateOfBirth: item.date_of_birth || "", email: item.email || "Managed through login", address: item.address || "", phone: item.phone || "",
         paymentMethod: item.payment_method || "Other", paymentContact: item.payment_contact || "",
         serviceArea: item.service_area || "", emergencyContact: item.emergency_contact || "",
         joinedAt: item.created_at, active: item.active, standing: item.standing,
@@ -386,11 +387,38 @@ export default function Home() {
     setBlocks((current) => current.filter((item) => item.id !== id));
     notify("Work block deleted.");
   }
-  function completeRegistration(employee: EmployeeProfile) {
+  async function completeRegistration(employee: EmployeeProfile, password: string) {
+    if (supabase && session) {
+      const { error: passwordError } = await supabase.auth.updateUser({ password });
+      if (passwordError) return passwordError.message;
+      const { error } = await supabase.rpc("register_employee", {
+        first_name_input: employee.firstName, last_name_input: employee.lastName,
+        date_of_birth_input: employee.dateOfBirth, language_input: employee.language,
+        phone_input: employee.phone, address_input: employee.address,
+        payment_method_input: employee.paymentMethod.toLowerCase(), payment_contact_input: employee.paymentContact,
+        service_area_input: employee.serviceArea || null, emergency_contact_input: employee.emergencyContact || null,
+      });
+      if (error) return error.message;
+      setShowRegistration(false);
+      notify("Registration complete. Welcome to the team!");
+      await loadProductionData(session);
+      return;
+    }
     setEmployees((current) => [employee, ...current]);
     localStorage.setItem("dhc-demo-onboarded", "true");
     setShowRegistration(false);
     notify("Registration complete. Welcome to the team!");
+  }
+  async function inviteEmployee(name: string, email: string) {
+    if (!session) return "Please sign in again before sending an invitation.";
+    const response = await fetch("/api/employees/invite", {
+      method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` },
+      body: JSON.stringify({ name, email }),
+    });
+    const result = await response.json() as { error?: string };
+    if (!response.ok) return result.error || "The invitation could not be sent.";
+    notify(`Invitation sent to ${email}.`);
+    await loadProductionData(session);
   }
   async function setEmployeeActive(id: string, active: boolean) {
     if (supabase && session) {
@@ -439,7 +467,7 @@ export default function Home() {
         : <OwnerView blocks={blocks} employees={employees} alerts={ownerAlerts}
           onCreate={() => setShowForm(true)} onEdit={setEditingBlock} onDelete={deleteBlock}
           onAssign={assignBlock} onUnassign={unassignBlock}
-          onSetEmployeeActive={setEmployeeActive} />}
+          onSetEmployeeActive={setEmployeeActive} onInviteEmployee={inviteEmployee} />}
       {showForm && <CreateBlock onClose={() => setShowForm(false)} onCreate={createBlock} />}
       {editingBlock && <CreateBlock key={editingBlock.id} initialBlock={editingBlock}
         onClose={() => setEditingBlock(null)} onCreate={updateBlock} />}
@@ -583,11 +611,12 @@ function JobCard({ block, onClaim }: { block: WorkBlock; onClaim: (id: string) =
   </article>;
 }
 
-function OwnerView({ blocks, employees, alerts, onCreate, onEdit, onDelete, onAssign, onUnassign, onSetEmployeeActive }: {
+function OwnerView({ blocks, employees, alerts, onCreate, onEdit, onDelete, onAssign, onUnassign, onSetEmployeeActive, onInviteEmployee }: {
   blocks: WorkBlock[]; employees: EmployeeProfile[]; alerts: string[];
   onCreate: () => void; onEdit: (block: WorkBlock) => void; onDelete: (id: string) => void;
   onAssign: (id: string, employeeId: string) => void; onUnassign: (id: string) => void;
   onSetEmployeeActive: (id: string, active: boolean) => void;
+  onInviteEmployee: (name: string, email: string) => Promise<string | void>;
 }) {
   const [section, setSection] = useState<"work" | "employees">("work");
   return <section className="page">
@@ -597,7 +626,7 @@ function OwnerView({ blocks, employees, alerts, onCreate, onEdit, onDelete, onAs
         Employees <span>{employees.length}</span></button>
     </nav>
     {section === "employees"
-      ? <EmployeeDirectory employees={employees} onSetActive={onSetEmployeeActive} />
+      ? <EmployeeDirectory employees={employees} onSetActive={onSetEmployeeActive} onInvite={onInviteEmployee} />
       : <OwnerWorkBoard blocks={blocks} employees={employees} alerts={alerts} onCreate={onCreate}
           onEdit={onEdit} onDelete={onDelete} onAssign={onAssign} onUnassign={onUnassign} />}
   </section>;

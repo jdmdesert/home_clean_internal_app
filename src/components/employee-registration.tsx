@@ -13,6 +13,7 @@ export type EmployeeProfile = {
   name: string;
   dateOfBirth: string;
   email: string;
+  address: string;
   phone: string;
   paymentMethod: "Zelle" | "ACH" | "Check" | "Other";
   paymentContact: string;
@@ -31,16 +32,18 @@ export type EmployeeProfile = {
 };
 
 export function EmployeeRegistration({ onComplete, onCancel }: {
-  onComplete: (employee: EmployeeProfile) => void;
+  onComplete: (employee: EmployeeProfile, password: string) => Promise<string | void> | string | void;
   onCancel?: () => void;
 }) {
   const [language, setLanguage] = useState<"English" | "Español" | null>(null);
+  const [error, setError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
   const spanish = language === "Español";
   const copy = spanish ? {
     eyebrow: "REGISTRO DE EMPLEADO", title: "Cuéntanos sobre ti",
     intro: "Esta información se utiliza para trabajo y pagos.",
     firstName: "Nombre", lastName: "Apellido", dob: "Fecha de nacimiento",
-    email: "Correo electrónico", phone: "Número de teléfono",
+    email: "Correo electrónico", phone: "Número de teléfono", address: "Dirección de casa",
     payment: "¿Cómo prefieres recibir tu pago?", paymentContact: "Correo o teléfono para el pago",
     area: "Ciudades o área donde prefieres trabajar", emergency: "Contacto de emergencia (opcional)",
     consent: "Confirmo que esta información es correcta y acepto recibir avisos de trabajo.",
@@ -49,30 +52,36 @@ export function EmployeeRegistration({ onComplete, onCancel }: {
     eyebrow: "EMPLOYEE REGISTRATION", title: "Tell us about yourself",
     intro: "We use this information for work communication and payments.",
     firstName: "First name", lastName: "Last name", dob: "Date of birth",
-    email: "Email address", phone: "Phone number",
+    email: "Email address", phone: "Phone number", address: "Home address",
     payment: "How would you like to be paid?", paymentContact: "Email or phone used for payment",
     area: "Cities or area where you prefer to work", emergency: "Emergency contact (optional)",
     consent: "I confirm this information is correct and agree to receive work notifications.",
     submit: "Finish registration", back: "Back",
   };
 
-  function submit(event: FormEvent<HTMLFormElement>) {
+  async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!language) return;
     const data = new FormData(event.currentTarget);
     const method = String(data.get("paymentMethod")) as EmployeeProfile["paymentMethod"];
     const firstName = String(data.get("firstName")).trim();
     const lastName = String(data.get("lastName")).trim();
-    onComplete({
+    const password = String(data.get("password"));
+    if (password.length < 8) return setError(spanish ? "Use al menos 8 caracteres." : "Use at least 8 characters.");
+    if (password !== String(data.get("confirmation"))) return setError(spanish ? "Las contraseñas no coinciden." : "The passwords do not match.");
+    setSubmitting(true); setError("");
+    const completionError = await onComplete({
       id: createId(), language, firstName, lastName, name: `${firstName} ${lastName}`,
       dateOfBirth: String(data.get("dateOfBirth")),
-      email: String(data.get("email")), phone: String(data.get("phone")),
+      email: String(data.get("email")), phone: String(data.get("phone")), address: String(data.get("address")),
       paymentMethod: method, paymentContact: String(data.get("paymentContact")),
       serviceArea: String(data.get("serviceArea")), emergencyContact: String(data.get("emergencyContact")),
       joinedAt: new Date().toISOString(), active: true, standing: "new", score: null,
       standingNote: "Not enough work history to calculate a standing.",
       completedJobs: 0, attendanceRate: null, paidMonth: 0, paidYear: 0, paidLifetime: 0,
-    });
+    }, password);
+    if (completionError) setError(completionError);
+    setSubmitting(false);
   }
 
   if (!language) {
@@ -101,6 +110,9 @@ export function EmployeeRegistration({ onComplete, onCancel }: {
         <label>{copy.dob}<input name="dateOfBirth" type="date" max={new Date().toISOString().slice(0, 10)} required /></label>
         <label>{copy.email}<input name="email" type="email" autoComplete="email" required /></label>
         <label>{copy.phone}<input name="phone" type="tel" autoComplete="tel" required placeholder="(602) 555-0100" /></label>
+        <label className="wide">{copy.address}<input name="address" autoComplete="street-address" required /></label>
+        <label>{spanish ? "Crear contraseña" : "Create password"}<input name="password" type="password" autoComplete="new-password" minLength={8} required /></label>
+        <label>{spanish ? "Confirmar contraseña" : "Confirm password"}<input name="confirmation" type="password" autoComplete="new-password" minLength={8} required /></label>
         <label>{copy.payment}
           <select name="paymentMethod" required>
             <option value="Zelle">Zelle</option><option value="ACH">ACH / Direct deposit</option>
@@ -114,7 +126,8 @@ export function EmployeeRegistration({ onComplete, onCancel }: {
         <label>{copy.area}<input name="serviceArea" placeholder="Phoenix, Scottsdale, Tempe" /></label>
         <label>{copy.emergency}<input name="emergencyContact" placeholder="Name and phone number" /></label>
         <label className="consent"><input name="consent" type="checkbox" required /><span>{copy.consent}</span></label>
-        <button className="primary">{copy.submit}</button>
+        {error && <p className="form-error wide">{error}</p>}
+        <button className="primary" disabled={submitting}>{submitting ? (spanish ? "Guardando…" : "Saving…") : copy.submit}</button>
       </form>
     </div>
   </section>;

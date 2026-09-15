@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { FormEvent, useState } from "react";
 import type { EmployeeProfile, EmployeeStanding } from "./employee-registration";
 
 const standingCopy: Record<EmployeeStanding, { label: string; description: string }> = {
@@ -13,10 +13,25 @@ const standingCopy: Record<EmployeeStanding, { label: string; description: strin
 const money = (value: number) => new Intl.NumberFormat("en-US",
   { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(value);
 
-export function EmployeeDirectory({ employees, onSetActive }: {
+export function EmployeeDirectory({ employees, onSetActive, onInvite }: {
   employees: EmployeeProfile[]; onSetActive: (id: string, active: boolean) => void;
+  onInvite?: (name: string, email: string) => Promise<string | void>;
 }) {
   const [selected, setSelected] = useState<EmployeeProfile | null>(null);
+  const [inviting, setInviting] = useState(false);
+  const [inviteError, setInviteError] = useState("");
+  const [inviteOpen, setInviteOpen] = useState(false);
+
+  async function submitInvite(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!onInvite) return;
+    const form = new FormData(event.currentTarget);
+    setInviting(true); setInviteError("");
+    const error = await onInvite(String(form.get("name")).trim(), String(form.get("email")).trim());
+    setInviting(false);
+    if (error) setInviteError(error);
+    else setInviteOpen(false);
+  }
 
   if (selected) return <EmployeeDetail employee={selected} onBack={() => setSelected(null)}
     onSetActive={(active) => {
@@ -25,20 +40,34 @@ export function EmployeeDirectory({ employees, onSetActive }: {
     }} />;
 
   return <div className="employee-directory">
-    <div className="directory-heading"><div><h2>Registered employees</h2>
-      <p>Contact details, standing, and payment history.</p></div><span>{employees.length} employees</span></div>
+    <div className="directory-heading"><div><h2>Employees</h2>
+      <p>Invitations, contact details, standing, and payment history.</p></div>
+      <div className="directory-actions"><span>{employees.length} employees</span>
+        {onInvite && <button className="primary compact" onClick={() => setInviteOpen(true)}>＋ Invite employee</button>}</div></div>
     <div className="employee-stack">
       {employees.map((employee) => <button className="employee-row" key={employee.id} onClick={() => setSelected(employee)}>
         <div className="employee-initials">{employee.name.split(" ").map((part) => part[0]).slice(0, 2).join("")}</div>
-        <div className="employee-name"><b>{employee.name}</b><span>{employee.phone}</span>
+        <div className="employee-name"><b>{employee.name}</b><span>{employee.phone || employee.email}</span>
           <span className={`account-status ${employee.active ? "active" : "inactive"}`}>
-            <i />{employee.active ? "Active" : "Inactive"}
+            <i />{employee.active ? "Active" : employee.phone ? "Inactive" : "Invitation pending"}
           </span>
         </div>
         <StandingRing employee={employee} />
         <span className="employee-chevron">›</span>
       </button>)}
     </div>
+    {inviteOpen && <div className="modal-backdrop"><section className="modal invite-modal">
+      <button className="close" aria-label="Close" onClick={() => setInviteOpen(false)}>×</button>
+      <p className="eyebrow">EMPLOYEE ONBOARDING</p><h2>Invite an employee</h2>
+      <p className="form-intro">They’ll receive a welcome email with iPhone and Android application links.</p>
+      <form onSubmit={submitInvite}>
+        <label className="wide">Full name<input name="name" autoComplete="name" required /></label>
+        <label className="wide">Email address<input name="email" type="email" autoComplete="email" required /></label>
+        {inviteError && <p className="form-error wide">{inviteError}</p>}
+        <div className="form-actions"><button type="button" className="secondary" onClick={() => setInviteOpen(false)}>Cancel</button>
+          <button className="primary" disabled={inviting}>{inviting ? "Sending…" : "Send invitation"}</button></div>
+      </form>
+    </section></div>}
     <p className="score-explainer">Standing uses documented attendance, completed work, and customer feedback. New employees remain unrated until enough work history exists.</p>
   </div>;
 }
@@ -87,6 +116,7 @@ function EmployeeDetail({ employee, onBack, onSetActive }: {
             ? new Date(`${employee.dateOfBirth}T12:00:00`).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })
             : "Not provided"}</dd>
           <dt>Email</dt><dd>{employee.email}</dd><dt>Phone</dt><dd>{employee.phone}</dd>
+          <dt>Home address</dt><dd>{employee.address || "Not provided"}</dd>
           <dt>Language</dt><dd>{employee.language}</dd><dt>Preferred service area</dt><dd>{employee.serviceArea || "Not specified"}</dd>
           <dt>Emergency contact</dt><dd>{employee.emergencyContact || "Not provided"}</dd></dl></section>
       <section><h3>Payment</h3>
