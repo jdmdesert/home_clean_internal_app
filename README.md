@@ -41,6 +41,10 @@ experiences.
 The two employee accounts are test seats. They can be renamed later, or removed and
 replaced when cleaners are hired. Do not reuse the initial pilot password for production.
 
+If the Supabase project already contains the original `profiles` table with `admin` and
+`cleaner` roles, run [`supabase/upgrade_legacy_schema.sql`](supabase/upgrade_legacy_schema.sql)
+instead. It preserves those accounts and maps them to `owner` and `employee`.
+
 ## Pilot verification
 
 - Sign in as both owners and confirm each can post work.
