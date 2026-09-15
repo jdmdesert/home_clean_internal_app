@@ -409,11 +409,11 @@ export default function Home() {
     setShowRegistration(false);
     notify("Registration complete. Welcome to the team!");
   }
-  async function inviteEmployee(name: string, email: string) {
+  async function inviteEmployee(firstName: string, lastName: string, email: string) {
     if (!session) return "Please sign in again before sending an invitation.";
     const response = await fetch("/api/employees/invite", {
       method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` },
-      body: JSON.stringify({ name, email }),
+      body: JSON.stringify({ firstName, lastName, email }),
     });
     const result = await response.json() as { error?: string };
     if (!response.ok) return result.error || "The invitation could not be sent.";
@@ -616,7 +616,7 @@ function OwnerView({ blocks, employees, alerts, onCreate, onEdit, onDelete, onAs
   onCreate: () => void; onEdit: (block: WorkBlock) => void; onDelete: (id: string) => void;
   onAssign: (id: string, employeeId: string) => void; onUnassign: (id: string) => void;
   onSetEmployeeActive: (id: string, active: boolean) => void;
-  onInviteEmployee: (name: string, email: string) => Promise<string | void>;
+  onInviteEmployee: (firstName: string, lastName: string, email: string) => Promise<string | void>;
 }) {
   const [section, setSection] = useState<"work" | "employees">("work");
   return <section className="page">

@@ -30,7 +30,7 @@ All notable changes to the Steadfast & Co. Cleaning Team App are recorded here.
 - Added safeguards against indefinite authentication loading on mobile devices.
 - Added account activation and deactivation controls for employees.
 - Added English and Spanish employee registration flows.
-- Added owner-initiated employee invitations using only a name and email address.
+- Added owner-initiated employee invitations using first name, last name, and email address.
 - Added pending-invitation employee records that become active after registration.
 - Added employee collection of a password, phone number, home address, language, payment preference, service area, and emergency contact.
 - Added a branded “Welcome to Steadfast & Co. Cleaning” invitation email template with separate iOS and Android application links.

@@ -15,7 +15,7 @@ const money = (value: number) => new Intl.NumberFormat("en-US",
 
 export function EmployeeDirectory({ employees, onSetActive, onInvite }: {
   employees: EmployeeProfile[]; onSetActive: (id: string, active: boolean) => void;
-  onInvite?: (name: string, email: string) => Promise<string | void>;
+  onInvite?: (firstName: string, lastName: string, email: string) => Promise<string | void>;
 }) {
   const [selected, setSelected] = useState<EmployeeProfile | null>(null);
   const [inviting, setInviting] = useState(false);
@@ -27,7 +27,11 @@ export function EmployeeDirectory({ employees, onSetActive, onInvite }: {
     if (!onInvite) return;
     const form = new FormData(event.currentTarget);
     setInviting(true); setInviteError("");
-    const error = await onInvite(String(form.get("name")).trim(), String(form.get("email")).trim());
+    const error = await onInvite(
+      String(form.get("firstName")).trim(),
+      String(form.get("lastName")).trim(),
+      String(form.get("email")).trim(),
+    );
     setInviting(false);
     if (error) setInviteError(error);
     else setInviteOpen(false);
@@ -61,7 +65,8 @@ export function EmployeeDirectory({ employees, onSetActive, onInvite }: {
       <p className="eyebrow">EMPLOYEE ONBOARDING</p><h2>Invite an employee</h2>
       <p className="form-intro">They’ll receive a welcome email with iPhone and Android application links.</p>
       <form onSubmit={submitInvite}>
-        <label className="wide">Full name<input name="name" autoComplete="name" required /></label>
+        <label>First name<input name="firstName" autoComplete="given-name" required /></label>
+        <label>Last name<input name="lastName" autoComplete="family-name" required /></label>
         <label className="wide">Email address<input name="email" type="email" autoComplete="email" required /></label>
         {inviteError && <p className="form-error wide">{inviteError}</p>}
         <div className="form-actions"><button type="button" className="secondary" onClick={() => setInviteOpen(false)}>Cancel</button>

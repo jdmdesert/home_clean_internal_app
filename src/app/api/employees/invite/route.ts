@@ -14,16 +14,19 @@ export async function POST(request: Request) {
     .eq("role", "owner").eq("active", true).maybeSingle();
   if (!owner) return Response.json({ error: "Owner access required." }, { status: 403 });
 
-  const body = await request.json() as { name?: string; email?: string };
-  const name = body.name?.trim();
+  const body = await request.json() as { firstName?: string; lastName?: string; email?: string };
+  const firstName = body.firstName?.trim();
+  const lastName = body.lastName?.trim();
+  const name = firstName && lastName ? `${firstName} ${lastName}` : "";
   const email = body.email?.trim().toLowerCase();
   if (!name || !email || !/^\S+@\S+\.\S+$/.test(email)) {
-    return Response.json({ error: "Enter the employee’s full name and a valid email address." }, { status: 400 });
+    return Response.json({ error: "Enter the employee’s first name, last name, and a valid email address." }, { status: 400 });
   }
 
   const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || "https://steadfast-cleaning.netlify.app").replace(/\/$/, "");
   const { data: invitation, error: inviteError } = await admin.auth.admin.inviteUserByEmail(email, {
-    data: { full_name: name, role: "employee" }, redirectTo: `${siteUrl}/?invite=1`,
+    data: { full_name: name, first_name: firstName, last_name: lastName, role: "employee" },
+    redirectTo: `${siteUrl}/?invite=1`,
   });
   if (inviteError || !invitation.user) {
     const message = inviteError?.message || "Supabase could not create the invitation.";
@@ -31,7 +34,8 @@ export async function POST(request: Request) {
   }
 
   const { error: profileError } = await admin.from("profiles").upsert({
-    id: invitation.user.id, full_name: name, email, role: "employee", active: false, onboarding_complete: false,
+    id: invitation.user.id, full_name: name, first_name: firstName, last_name: lastName,
+    email, role: "employee", active: false, onboarding_complete: false,
   }, { onConflict: "id" });
   if (profileError) {
     await admin.auth.admin.deleteUser(invitation.user.id);

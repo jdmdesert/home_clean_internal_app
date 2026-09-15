@@ -75,8 +75,8 @@ Never put a Supabase service-role key in browser-visible environment variables.
 
 ## Employee invitations
 
-Owners can invite an employee from **Employees → Invite employee** using only a name and
-email address. Before using invitations in production:
+Owners can invite an employee from **Employees → Invite employee** using a first name,
+last name, and email address. Before using invitations in production:
 
 1. Run [`supabase/employee_invitation_upgrade.sql`](supabase/employee_invitation_upgrade.sql)
    once in the Supabase SQL Editor.
