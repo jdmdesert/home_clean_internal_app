@@ -336,7 +336,7 @@ export default function Home() {
   if (loading) return <div className="auth-shell"><div className="auth-card"><h1>Loading work board…</h1></div></div>;
   if (isSupabaseConfigured && !session) return <LoginScreen />;
   if (isSupabaseConfigured && (!account || appError)) return <div className="auth-shell"><div className="auth-card">
-    <h1>Account setup needed</h1><p>{appError}</p>
+    <h1>{account ? "App access needs attention" : "Account setup needed"}</h1><p>{appError}</p>
     <button className="secondary" onClick={() => void supabase?.auth.signOut()}>Sign out</button>
   </div></div>;
 

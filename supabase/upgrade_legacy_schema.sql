@@ -126,6 +126,18 @@ alter table public.owner_notifications enable row level security;
 alter table public.email_outbox enable row level security;
 alter table public.employee_payments enable row level security;
 
+-- PostgREST requires table privileges in addition to row-level policies. RLS below
+-- still determines which rows each signed-in user can read or change.
+grant usage on schema public to authenticated;
+grant select on public.profiles to authenticated;
+grant select, insert, update on public.work_blocks to authenticated;
+grant select, insert, update on public.work_block_private_details to authenticated;
+grant select, insert, update, delete on public.push_subscriptions to authenticated;
+grant select, update on public.owner_notifications to authenticated;
+grant select on public.email_outbox to authenticated;
+grant select, insert, update, delete on public.employee_payments to authenticated;
+grant usage, select on all sequences in schema public to authenticated;
+
 create function public.is_owner()
 returns boolean language sql stable security definer set search_path = '' as $$
   select exists (
