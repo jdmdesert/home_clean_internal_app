@@ -325,7 +325,7 @@ export default function Home() {
   return (
     <main>
       <header className="topbar">
-        <div className="brand"><span className="brand-mark">S&amp;C</span>
+        <div className="brand"><span className="brand-mark">SC</span>
           <span><b>Steadfast &amp; Co.</b><small>Cleaning</small></span></div>
         <button className="avatar" aria-label="Open account menu">{role === "owner" ? "JD" : "MR"}</button>
       </header>
@@ -381,7 +381,7 @@ function LoginScreen() {
     setSubmitting(false);
   }
   return <main className="auth-shell"><section className="auth-card">
-    <div className="brand"><span className="brand-mark">S&amp;C</span><span><b>Steadfast &amp; Co.</b><small>Cleaning</small></span></div>
+    <div className="brand"><span className="brand-mark">SC</span><span><b>Steadfast &amp; Co.</b><small>Cleaning</small></span></div>
     {forgotMode ? <>
       <p className="eyebrow">ACCOUNT RECOVERY</p><h1>Reset your password</h1>
       {resetSent ? <div className="auth-success"><b>Check your email</b><p>If an account exists for that address, a password-reset link is on its way.</p></div>
@@ -422,7 +422,7 @@ function ResetPasswordScreen({ onDone }: { onDone: () => void }) {
     setSubmitting(false);
   }
   return <main className="auth-shell"><section className="auth-card">
-    <div className="brand"><span className="brand-mark">S&amp;C</span><span><b>Steadfast &amp; Co.</b><small>Cleaning</small></span></div>
+    <div className="brand"><span className="brand-mark">SC</span><span><b>Steadfast &amp; Co.</b><small>Cleaning</small></span></div>
     <p className="eyebrow">ACCOUNT RECOVERY</p><h1>Choose a new password</h1>
     <p>Your new password must contain at least eight characters.</p>
     <form onSubmit={updatePassword}>
