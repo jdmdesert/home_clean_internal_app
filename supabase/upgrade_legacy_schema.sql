@@ -30,6 +30,7 @@ alter table public.profiles
   add column if not exists active boolean not null default true;
 
 alter table public.profiles alter column role drop default;
+alter table public.profiles drop constraint if exists profiles_role_check;
 update public.profiles
 set role = case when lower(role) in ('admin', 'owner') then 'owner' else 'employee' end,
     full_name = coalesce(nullif(trim(full_name), ''), id::text),
@@ -41,6 +42,8 @@ set role = case when lower(role) in ('admin', 'owner') then 'owner' else 'employ
 alter table public.profiles alter column role set default 'employee';
 alter table public.profiles alter column role set not null;
 alter table public.profiles alter column full_name set not null;
+alter table public.profiles
+  add constraint profiles_role_check check (role in ('owner', 'employee'));
 
 create table public.work_blocks (
   id uuid primary key default gen_random_uuid(),
