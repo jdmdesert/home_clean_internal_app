@@ -3,6 +3,9 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { EmployeeDirectory } from "@/components/employee-directory";
 import { EmployeeRegistration, type EmployeeProfile } from "@/components/employee-registration";
+import { NotificationButton } from "@/components/notification-button";
+import { isSupabaseConfigured, supabase } from "@/lib/supabase";
+import type { Session } from "@supabase/supabase-js";
 
 type Role = "owner" | "employee";
 type Status = "open" | "claimed" | "completed";
@@ -13,6 +16,30 @@ type WorkBlock = {
   occupancy: "vacant" | "occupied"; ownersPresent?: boolean;
   status: Status; claimedBy?: string;
 };
+
+type AccountProfile = { id: string; full_name: string; role: Role; active: boolean };
+type WorkBlockRow = {
+  id: string; title: string; starts_at: string; ends_at: string; city: string;
+  postal_code: string; square_feet: number; occupancy: "vacant" | "occupied";
+  owners_present: boolean | null; employee_pay: number; tasks: string[];
+  status: Status; claimed_by: string | null;
+  work_block_private_details?: Array<{ address: string; access_codes: string | null; private_notes: string | null }>;
+};
+
+function rowToBlock(row: WorkBlockRow, employeeNames: Map<string, string>): WorkBlock {
+  const starts = new Date(row.starts_at);
+  const ends = new Date(row.ends_at);
+  const privateDetails = row.work_block_private_details?.[0];
+  return {
+    id: row.id, title: row.title, date: starts.toLocaleDateString("en-CA"),
+    startTime: starts.toTimeString().slice(0, 5), endTime: ends.toTimeString().slice(0, 5),
+    city: row.city, zip: row.postal_code, squareFeet: row.square_feet,
+    address: privateDetails?.address || "", accessCodes: privateDetails?.access_codes || "",
+    pay: Number(row.employee_pay), details: row.tasks || [], notes: privateDetails?.private_notes || "",
+    occupancy: row.occupancy, ownersPresent: row.owners_present ?? undefined,
+    status: row.status, claimedBy: row.claimed_by ? employeeNames.get(row.claimed_by) || "Assigned employee" : undefined,
+  };
+}
 
 const jobTemplates: Record<string, string[]> = {
   "Airbnb Cleaning": ["Clean and sanitize kitchen", "Clean bathrooms", "Change linens", "Restock guest supplies", "Vacuum and mop all floors"],
@@ -76,8 +103,86 @@ export default function Home() {
   const [ownerAlerts, setOwnerAlerts] = useState<string[]>([]);
   const [employees, setEmployees] = useState<EmployeeProfile[]>(seedEmployees);
   const [showRegistration, setShowRegistration] = useState(false);
+  const [session, setSession] = useState<Session | null>(null);
+  const [account, setAccount] = useState<AccountProfile | null>(null);
+  const [loading, setLoading] = useState(isSupabaseConfigured);
+  const [appError, setAppError] = useState("");
+
+  async function loadProductionData(currentSession: Session) {
+    if (!supabase) return;
+    setAppError("");
+    const { data: profile, error: profileError } = await supabase
+      .from("profiles").select("id, full_name, role, active").eq("id", currentSession.user.id).single();
+    if (profileError || !profile) {
+      setAppError("This account has not been added to the cleaning team yet.");
+      setLoading(false);
+      return;
+    }
+    const typedProfile = profile as AccountProfile;
+    setAccount(typedProfile);
+    setRole(typedProfile.role);
+
+    const { data: profileRows } = typedProfile.role === "owner"
+      ? await supabase.from("profiles").select("*").eq("role", "employee").order("full_name")
+      : { data: [] };
+    const names = new Map<string, string>((profileRows || []).map((item) => [item.id, item.full_name]));
+    names.set(typedProfile.id, typedProfile.full_name);
+
+    const { data: workRows, error: workError } = await supabase
+      .from("work_blocks")
+      .select("*, work_block_private_details(address, access_codes, private_notes)")
+      .order("starts_at", { ascending: true });
+    if (workError) setAppError(workError.message);
+    else setBlocks(((workRows || []) as WorkBlockRow[]).map((row) => rowToBlock(row, names)));
+
+    if (typedProfile.role === "owner") {
+      setEmployees((profileRows || []).map((item) => ({
+        id: item.id, language: item.preferred_language || "English",
+        firstName: item.first_name || "", lastName: item.last_name || "", name: item.full_name,
+        dateOfBirth: item.date_of_birth || "", email: "Managed through login", phone: item.phone || "",
+        paymentMethod: item.payment_method || "Other", paymentContact: item.payment_contact || "",
+        serviceArea: item.service_area || "", emergencyContact: item.emergency_contact || "",
+        joinedAt: item.created_at, active: item.active, standing: item.standing,
+        score: item.performance_score, standingNote: item.standing_note || "",
+        completedJobs: 0, attendanceRate: null, paidMonth: 0, paidYear: 0, paidLifetime: 0,
+      })) as EmployeeProfile[]);
+      const { data: alerts } = await supabase.from("owner_notifications")
+        .select("message").order("created_at", { ascending: false }).limit(10);
+      setOwnerAlerts((alerts || []).map((item) => item.message));
+    }
+    setLoading(false);
+  }
 
   useEffect(() => {
+    if (!supabase) return;
+    let active = true;
+    supabase.auth.getSession().then(({ data }) => {
+      if (!active) return;
+      setSession(data.session);
+      if (data.session) void loadProductionData(data.session);
+      else setLoading(false);
+    });
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+      if (!active) return;
+      setSession(nextSession);
+      if (nextSession) void loadProductionData(nextSession);
+      else { setAccount(null); setLoading(false); }
+    });
+    return () => { active = false; listener.subscription.unsubscribe(); };
+  }, []);
+
+  useEffect(() => {
+    if (!supabase || !session) return;
+    const client = supabase;
+    const channel = client.channel("work-board")
+      .on("postgres_changes", { event: "*", schema: "public", table: "work_blocks" },
+        () => void loadProductionData(session))
+      .subscribe();
+    return () => { void client.removeChannel(channel); };
+  }, [session]);
+
+  useEffect(() => {
+    if (isSupabaseConfigured) return;
     const saved = localStorage.getItem("dhc-demo-blocks");
     if (saved) {
       const parsed = JSON.parse(saved) as Array<WorkBlock & { duration?: number; area?: string }>;
@@ -86,8 +191,11 @@ export default function Home() {
       if (compatible) queueMicrotask(() => setBlocks(parsed));
     }
   }, []);
-  useEffect(() => { localStorage.setItem("dhc-demo-blocks", JSON.stringify(blocks)); }, [blocks]);
   useEffect(() => {
+    if (!isSupabaseConfigured) localStorage.setItem("dhc-demo-blocks", JSON.stringify(blocks));
+  }, [blocks]);
+  useEffect(() => {
+    if (isSupabaseConfigured) return;
     const saved = localStorage.getItem("dhc-demo-employees");
     if (saved) {
       const parsed = JSON.parse(saved) as Array<EmployeeProfile & {
@@ -103,17 +211,28 @@ export default function Home() {
     }
     if (!localStorage.getItem("dhc-demo-onboarded")) queueMicrotask(() => setShowRegistration(true));
   }, []);
-  useEffect(() => { localStorage.setItem("dhc-demo-employees", JSON.stringify(employees)); }, [employees]);
+  useEffect(() => {
+    if (!isSupabaseConfigured) localStorage.setItem("dhc-demo-employees", JSON.stringify(employees));
+  }, [employees]);
 
   const available = blocks.filter((block) => block.status === "open");
-  const mine = blocks.filter((block) => block.claimedBy === "Maria");
+  const mine = blocks.filter((block) => block.claimedBy === (account?.full_name || "Maria"));
   const shown = tab === "available" ? available : mine;
 
   function notify(message: string) {
     setToast(message);
     setTimeout(() => setToast(""), 3500);
   }
-  function claim(id: string) {
+  async function claim(id: string) {
+    if (supabase && session) {
+      const { data, error } = await supabase.rpc("claim_work_block", { block_id: id });
+      if (error) return notify(error.message);
+      if (!data?.[0]?.claimed) return notify("Another cleaner accepted this job first.");
+      notify("You got it! The address is now unlocked.");
+      setTab("mine");
+      await loadProductionData(session);
+      return;
+    }
     const claimedBlock = blocks.find((block) => block.id === id);
     setBlocks((current) => current.map((block) =>
       block.id === id && block.status === "open"
@@ -127,15 +246,49 @@ export default function Home() {
     }
     setTab("mine");
   }
-  function createBlock(block: WorkBlock) {
+  async function createBlock(block: WorkBlock) {
+    if (supabase && session) {
+      const startsAt = new Date(`${block.date}T${block.startTime}:00`).toISOString();
+      const endsAt = new Date(`${block.date}T${block.endTime}:00`).toISOString();
+      const { data: created, error } = await supabase.from("work_blocks").insert({
+        title: block.title, starts_at: startsAt, ends_at: endsAt, city: block.city,
+        postal_code: block.zip, square_feet: block.squareFeet, occupancy: block.occupancy,
+        owners_present: block.occupancy === "occupied" ? Boolean(block.ownersPresent) : null,
+        employee_pay: block.pay, tasks: block.details, created_by: session.user.id,
+      }).select("id").single();
+      if (error || !created) return notify(error?.message || "Could not create the job.");
+      const { error: privateError } = await supabase.from("work_block_private_details").insert({
+        work_block_id: created.id, address: block.address, access_codes: block.accessCodes || null,
+        private_notes: block.notes || null,
+      });
+      if (privateError) return notify(`Job created, but private details failed: ${privateError.message}`);
+      const { data: authData } = await supabase.auth.getSession();
+      if (authData.session) {
+        await fetch("/api/push/new-job", {
+          method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${authData.session.access_token}` },
+          body: JSON.stringify({ jobId: created.id, title: block.title, area: `${block.city}, AZ`, date: block.date }),
+        });
+      }
+      setShowForm(false);
+      notify("Work block posted to the team.");
+      await loadProductionData(session);
+      return;
+    }
     setBlocks((current) => [block, ...current]);
     setShowForm(false);
     notify("Work block posted to the team.");
   }
-  function unassignBlock(id: string) {
+  async function unassignBlock(id: string) {
     const block = blocks.find((item) => item.id === id);
     if (!block?.claimedBy) return;
     if (!window.confirm(`Remove ${block.claimedBy} from this job and make it available again?`)) return;
+    if (supabase && session) {
+      const { data, error } = await supabase.rpc("unassign_work_block", { block_id: id });
+      if (error || !data) return notify(error?.message || "The assignment could not be removed.");
+      notify("Assignment removed. The work block is available again.");
+      await loadProductionData(session);
+      return;
+    }
     setBlocks((current) => current.map((item) =>
       item.id === id ? { ...item, status: "open", claimedBy: undefined } : item));
     notify("Assignment removed. The work block is available again.");
@@ -146,11 +299,25 @@ export default function Home() {
     setShowRegistration(false);
     notify("Registration complete. Welcome to the team!");
   }
-  function setEmployeeActive(id: string, active: boolean) {
+  async function setEmployeeActive(id: string, active: boolean) {
+    if (supabase && session) {
+      const { error } = await supabase.rpc("set_employee_active", { employee_id: id, active_input: active });
+      if (error) return notify(error.message);
+      notify(active ? "Employee account reactivated." : "Employee account deactivated.");
+      await loadProductionData(session);
+      return;
+    }
     setEmployees((current) => current.map((employee) =>
       employee.id === id ? { ...employee, active } : employee));
     notify(active ? "Employee account reactivated." : "Employee account deactivated.");
   }
+
+  if (loading) return <div className="auth-shell"><div className="auth-card"><h1>Loading work board…</h1></div></div>;
+  if (isSupabaseConfigured && !session) return <LoginScreen />;
+  if (isSupabaseConfigured && (!account || appError)) return <div className="auth-shell"><div className="auth-card">
+    <h1>Account setup needed</h1><p>{appError}</p>
+    <button className="secondary" onClick={() => void supabase?.auth.signOut()}>Sign out</button>
+  </div></div>;
 
   return (
     <main>
@@ -160,12 +327,15 @@ export default function Home() {
         <button className="avatar" aria-label="Open account menu">{role === "owner" ? "JD" : "MR"}</button>
       </header>
       <div className="demo-bar">
-        <span><i /> Preview mode</span>
+        <span><i /> {isSupabaseConfigured ? `Signed in as ${account?.full_name}` : "Preview mode"}</span>
+        {!isSupabaseConfigured && <>
         <div className="role-switch">
           <button className={role === "employee" ? "active" : ""} onClick={() => setRole("employee")}>Employee</button>
           <button className={role === "owner" ? "active" : ""} onClick={() => setRole("owner")}>Owner</button>
         </div>
         {role === "employee" && <button className="signup-preview" onClick={() => setShowRegistration(true)}>Preview registration</button>}
+        </>}
+        {isSupabaseConfigured && <button className="signup-preview" onClick={() => void supabase?.auth.signOut()}>Sign out</button>}
       </div>
       {role === "employee" ? (showRegistration
         ? <EmployeeRegistration onComplete={completeRegistration} onCancel={() => setShowRegistration(false)} />
@@ -179,6 +349,32 @@ export default function Home() {
   );
 }
 
+function LoginScreen() {
+  const [error, setError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  async function signIn(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!supabase) return;
+    setSubmitting(true); setError("");
+    const form = new FormData(event.currentTarget);
+    const { error: authError } = await supabase.auth.signInWithPassword({
+      email: String(form.get("email")), password: String(form.get("password")),
+    });
+    if (authError) setError(authError.message);
+    setSubmitting(false);
+  }
+  return <main className="auth-shell"><section className="auth-card">
+    <div className="brand"><span className="brand-mark">D</span><span><b>Desert Home</b><small>Cleaning team</small></span></div>
+    <p className="eyebrow">PRIVATE WORK BOARD</p><h1>Welcome back</h1>
+    <p>Sign in with the account provided by the owner.</p>
+    <form onSubmit={signIn}><label>Email<input name="email" type="email" autoComplete="email" required /></label>
+      <label>Password<input name="password" type="password" autoComplete="current-password" required /></label>
+      {error && <p className="form-error">{error}</p>}
+      <button className="primary" disabled={submitting}>{submitting ? "Signing in…" : "Sign in"}</button>
+    </form>
+  </section></main>;
+}
+
 function EmployeeView({ blocks, availableCount, tab, setTab, claim }: {
   blocks: WorkBlock[]; availableCount: number; tab: "available" | "mine";
   setTab: (tab: "available" | "mine") => void; claim: (id: string) => void;
@@ -187,6 +383,7 @@ function EmployeeView({ blocks, availableCount, tab, setTab, claim }: {
     <div className="hero"><p className="eyebrow">MONDAY, JUNE 29</p>
       <h1>Good afternoon, Maria.</h1>
       <p>{availableCount ? `${availableCount} new work blocks are ready to claim.` : "You're all caught up for now."}</p>
+      {isSupabaseConfigured && <NotificationButton />}
     </div>
     <nav className="tabs">
       <button className={tab === "available" ? "active" : ""} onClick={() => setTab("available")}>

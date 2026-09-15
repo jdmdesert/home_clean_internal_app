@@ -22,14 +22,33 @@ npm run dev
 Open `http://localhost:3000`. Use the role switcher to preview the owner and employee
 experiences.
 
-## Production setup
+## Four-account pilot setup
 
 1. Create a Supabase project.
 2. Run [`supabase/schema.sql`](supabase/schema.sql) in its SQL editor.
-3. Copy `.env.example` to `.env.local` and add the project URL and publishable key.
-4. Create the owner's account and set that profile's role to `owner`.
-5. Invite employees and set their profiles to `employee`.
-6. Deploy to an HTTPS host such as Vercel.
+3. Copy `.env.example` to `.env.local` and add the Supabase project URL, publishable key,
+   server URL, and service-role key.
+4. Fill in two owner emails, two temporary employee emails, names, and a strong initial
+   password in `.env.local`.
+5. Run `npm run pilot:bootstrap`. It safely creates or updates exactly those four users.
+6. Generate Web Push keys with `npx web-push generate-vapid-keys`, then add the public
+   and private keys to `.env.local`. Set `VAPID_SUBJECT` to an owner email address.
+7. Run `npm run dev`, sign in as each temporary employee, and tap **Enable notifications**.
+8. Deploy to Vercel and copy the same production environment variables into the Vercel
+   project. Keep `SUPABASE_SERVICE_ROLE_KEY`, `VAPID_PRIVATE_KEY`, and the pilot password
+   server-only.
+
+The two employee accounts are test seats. They can be renamed later, or removed and
+replaced when cleaners are hired. Do not reuse the initial pilot password for production.
+
+## Pilot verification
+
+- Sign in as both owners and confirm each can post work.
+- Sign in on two employee phones and enable notifications.
+- Post a test job and confirm both phones receive it.
+- Accept simultaneously on both phones; only one employee should win.
+- Confirm only the winning employee sees the address and access instructions.
+- Remove the assignment from an owner account and confirm the job becomes available again.
 
 ### Activate owner acceptance emails
 
@@ -47,7 +66,7 @@ claims work.
 The email function uses the outbox row ID as an idempotency key, preventing duplicate
 emails if the webhook is retried.
 
-The app currently uses local demo data while production authentication is connected.
+The app uses local demo data only when Supabase environment variables are absent.
 Never put a Supabase service-role key in browser-visible environment variables.
 
 ## Security model

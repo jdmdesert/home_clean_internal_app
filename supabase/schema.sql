@@ -26,7 +26,7 @@ create table public.profiles (
   created_at timestamptz not null default now(),
   constraint completed_employee_identity check (
     role <> 'employee' or not onboarding_complete
-    or (first_name is not null and last_name is not null and date_of_birth is not null)
+    or (first_name is not null and last_name is not null)
   ),
   constraint new_employee_score_consistent check (
     (standing = 'new' and performance_score is null) or standing <> 'new'
