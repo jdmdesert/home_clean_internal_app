@@ -1,6 +1,7 @@
 -- Run once in the Supabase SQL Editor before sending employee invitations.
 begin;
 alter table public.profiles add column if not exists email text, add column if not exists address text;
+grant select, insert, update on table public.profiles to service_role;
 drop function if exists public.register_employee(text, text, date, text, text, public.payment_method, text, text, text);
 
 create or replace function public.register_employee(

@@ -34,6 +34,7 @@ All notable changes to the Steadfast & Co. Cleaning Team App are recorded here.
 - Added pending-invitation employee records that become active after registration.
 - Added employee collection of a password, phone number, home address, language, payment preference, service area, and emergency contact.
 - Added a branded “Welcome to Steadfast & Co. Cleaning” invitation email template with separate iOS and Android application links.
+- Granted the server-only Supabase role access to verify owners and create pending invitation profiles.
 
 ### Owner work management
 

@@ -116,6 +116,9 @@ alter table public.owner_notifications enable row level security;
 alter table public.email_outbox enable row level security;
 alter table public.employee_payments enable row level security;
 
+-- Server-only employee invitations verify owners and create pending profiles.
+grant select, insert, update on table public.profiles to service_role;
+
 -- PostgREST requires table privileges in addition to row-level policies. RLS below
 -- still determines which rows each signed-in user can read or change.
 grant usage on schema public to authenticated;

@@ -10,8 +10,9 @@ export async function POST(request: Request) {
   const admin = createClient(url, secretKey, { auth: { autoRefreshToken: false, persistSession: false, detectSessionInUrl: false } });
   const { data: userData, error: userError } = await admin.auth.getUser(token);
   if (userError || !userData.user) return Response.json({ error: "Unauthorized" }, { status: 401 });
-  const { data: owner } = await admin.from("profiles").select("id").eq("id", userData.user.id)
+  const { data: owner, error: ownerError } = await admin.from("profiles").select("id").eq("id", userData.user.id)
     .eq("role", "owner").eq("active", true).maybeSingle();
+  if (ownerError) return Response.json({ error: `Owner verification failed: ${ownerError.message}` }, { status: 500 });
   if (!owner) return Response.json({ error: "Owner access required." }, { status: 403 });
 
   const body = await request.json() as { firstName?: string; lastName?: string; email?: string };
