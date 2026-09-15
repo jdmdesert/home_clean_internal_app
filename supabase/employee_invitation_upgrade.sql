@@ -2,6 +2,56 @@
 begin;
 alter table public.profiles add column if not exists email text, add column if not exists address text;
 grant select, insert, update on table public.profiles to service_role;
+
+-- Supabase Auth invitations insert into auth.users first. Keep the automatic
+-- profile creation compatible with pending employee accounts.
+create or replace function public.handle_new_user()
+returns trigger language plpgsql security definer set search_path = '' as $$
+declare
+  invited_first_name text := nullif(trim(new.raw_user_meta_data ->> 'first_name'), '');
+  invited_last_name text := nullif(trim(new.raw_user_meta_data ->> 'last_name'), '');
+  invited_full_name text := nullif(trim(new.raw_user_meta_data ->> 'full_name'), '');
+begin
+  insert into public.profiles (
+    id, full_name, first_name, last_name, email, role, active, onboarding_complete
+  ) values (
+    new.id,
+    coalesce(invited_full_name, nullif(trim(new.email), ''), new.id::text),
+    invited_first_name,
+    invited_last_name,
+    lower(new.email),
+    'employee', false, false
+  ) on conflict (id) do nothing;
+  return new;
+end;
+$$;
+
+drop trigger if exists on_auth_user_created on auth.users;
+create trigger on_auth_user_created
+  after insert on auth.users
+  for each row execute function public.handle_new_user();
+
+create or replace function public.create_invited_employee_profile(
+  employee_id uuid, first_name_input text, last_name_input text, email_input text
+)
+returns uuid language plpgsql security definer set search_path = '' as $$
+begin
+  if not public.is_owner() then raise exception 'Only an owner can invite employees'; end if;
+  insert into public.profiles (
+    id, full_name, first_name, last_name, email, role, active, onboarding_complete
+  ) values (
+    employee_id, trim(first_name_input) || ' ' || trim(last_name_input),
+    trim(first_name_input), trim(last_name_input), lower(trim(email_input)),
+    'employee', false, false
+  ) on conflict (id) do update set
+    full_name = excluded.full_name, first_name = excluded.first_name,
+    last_name = excluded.last_name, email = excluded.email,
+    role = 'employee', active = false, onboarding_complete = false;
+  return employee_id;
+end;
+$$;
+revoke all on function public.create_invited_employee_profile(uuid, text, text, text) from public;
+grant execute on function public.create_invited_employee_profile(uuid, text, text, text) to authenticated;
 drop function if exists public.register_employee(text, text, date, text, text, public.payment_method, text, text, text);
 
 create or replace function public.register_employee(
