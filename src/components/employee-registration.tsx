@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useState } from "react";
+import { createId } from "@/lib/create-id";
 
 export type EmployeeStanding = "new" | "good" | "watch" | "risk";
 
@@ -63,7 +64,7 @@ export function EmployeeRegistration({ onComplete, onCancel }: {
     const firstName = String(data.get("firstName")).trim();
     const lastName = String(data.get("lastName")).trim();
     onComplete({
-      id: crypto.randomUUID(), language, firstName, lastName, name: `${firstName} ${lastName}`,
+      id: createId(), language, firstName, lastName, name: `${firstName} ${lastName}`,
       dateOfBirth: String(data.get("dateOfBirth")),
       email: String(data.get("email")), phone: String(data.get("phone")),
       paymentMethod: method, paymentContact: String(data.get("paymentContact")),

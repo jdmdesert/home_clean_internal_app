@@ -62,4 +62,5 @@ All notable changes to the Steadfast & Co. Cleaning Team App are recorded here.
 
 - Added local preview mode with sample jobs and employees.
 - Added LAN/mobile preview support for devices on the same Wi-Fi network.
+- Added mobile-safe ID generation for Safari and non-HTTPS local previews.
 - Added four-account pilot bootstrap tooling and setup documentation.

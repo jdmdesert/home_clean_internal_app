@@ -4,6 +4,7 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 import { EmployeeDirectory } from "@/components/employee-directory";
 import { EmployeeRegistration, type EmployeeProfile } from "@/components/employee-registration";
 import { NotificationButton } from "@/components/notification-button";
+import { createId } from "@/lib/create-id";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase";
 import type { Session } from "@supabase/supabase-js";
 
@@ -669,7 +670,7 @@ function CreateBlock({ onClose, onCreate, initialBlock }: {
     }
     setFormError("");
     const title = jobType === "Custom Job" ? String(data.get("customTitle")) : jobType;
-    onCreate({ id: initialBlock?.id || crypto.randomUUID(), title, date: String(data.get("date")),
+    onCreate({ id: initialBlock?.id || createId(), title, date: String(data.get("date")),
       startTime: String(data.get("startTime")), endTime: String(data.get("endTime")),
       city: String(data.get("city")), zip: String(data.get("zip")),
       squareFeet: Number(data.get("squareFeet")), address: String(data.get("address")),
