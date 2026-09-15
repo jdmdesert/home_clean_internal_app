@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
   <rect width="512" height="512" rx="110" fill="#17352d"/>
-  <text x="256" y="292" text-anchor="middle" fill="#f7f5ef" font-family="Arial, sans-serif" font-size="132" font-weight="800" letter-spacing="-10">S&amp;C</text>
-  <path d="M374 104l9 25 25 9-25 9-9 25-9-25-25-9 25-9 9-25z" fill="#e66a3b"/>
+  <circle cx="256" cy="256" r="172" fill="none" stroke="#f7f5ef" stroke-width="8"/>
+  <text x="250" y="292" text-anchor="middle" fill="#f7f5ef" font-family="Georgia, 'Times New Roman', serif" font-size="126" font-style="italic" font-weight="400" letter-spacing="-15">S&amp;C</text>
 </svg>

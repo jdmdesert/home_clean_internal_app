@@ -77,7 +77,7 @@ export function EmployeeRegistration({ onComplete, onCancel }: {
   if (!language) {
     return <section className="registration-shell">
       <div className="language-card">
-        <div className="registration-logo">D</div>
+        <div className="registration-logo">S&amp;C</div>
         <p className="eyebrow">WELCOME · BIENVENIDO</p>
         <h1>Choose your language</h1>
         <p>Elige tu idioma</p>
