@@ -94,6 +94,11 @@ const time = (value: string) => {
     .format(new Date(2026, 0, 1, hours, minutes));
 };
 
+const openedFromPasswordRecovery = typeof window !== "undefined" && (
+  new URLSearchParams(window.location.search).get("recovery") === "1"
+  || new URLSearchParams(window.location.hash.slice(1)).get("type") === "recovery"
+);
+
 export default function Home() {
   const [role, setRole] = useState<Role>("employee");
   const [blocks, setBlocks] = useState<WorkBlock[]>(seedBlocks);
@@ -157,10 +162,13 @@ export default function Home() {
   useEffect(() => {
     if (!supabase) return;
     let active = true;
+    if (openedFromPasswordRecovery) queueMicrotask(() => {
+      if (active) setRecoveringPassword(true);
+    });
     supabase.auth.getSession().then(({ data }) => {
       if (!active) return;
       setSession(data.session);
-      if (data.session) void loadProductionData(data.session);
+      if (data.session && !openedFromPasswordRecovery) void loadProductionData(data.session);
       else setLoading(false);
     });
     const { data: listener } = supabase.auth.onAuthStateChange((event, nextSession) => {
@@ -374,7 +382,7 @@ function LoginScreen() {
     setSubmitting(true); setError("");
     const form = new FormData(event.currentTarget);
     const { error: resetError } = await supabase.auth.resetPasswordForEmail(String(form.get("email")), {
-      redirectTo: window.location.origin,
+      redirectTo: `${window.location.origin}/?recovery=1`,
     });
     if (resetError) setError(resetError.message);
     else setResetSent(true);
@@ -418,7 +426,11 @@ function ResetPasswordScreen({ onDone }: { onDone: () => void }) {
     setSubmitting(true); setError("");
     const { error: updateError } = await supabase.auth.updateUser({ password });
     if (updateError) setError(updateError.message);
-    else onDone();
+    else {
+      await supabase.auth.signOut();
+      window.history.replaceState({}, "", window.location.pathname);
+      onDone();
+    }
     setSubmitting(false);
   }
   return <main className="auth-shell"><section className="auth-card">
