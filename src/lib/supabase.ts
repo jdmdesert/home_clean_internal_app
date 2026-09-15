@@ -1,4 +1,4 @@
-import { createBrowserClient } from "@supabase/ssr";
+import { createClient } from "@supabase/supabase-js";
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const publishableKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
@@ -6,5 +6,11 @@ const publishableKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 export const isSupabaseConfigured = Boolean(url && publishableKey);
 
 export const supabase = isSupabaseConfigured
-  ? createBrowserClient(url!, publishableKey!)
+  ? createClient(url!, publishableKey!, {
+      auth: {
+        detectSessionInUrl: true,
+        flowType: "implicit",
+        persistSession: true,
+      },
+    })
   : null;
