@@ -95,6 +95,14 @@ const time = (value: string) => {
     .format(new Date(2026, 0, 1, hours, minutes));
 };
 
+function initialsFor(name?: string) {
+  if (!name) return "SC";
+  const displayName = name.includes("@") ? name.split("@")[0].replace(/[._-]+/g, " ") : name;
+  const parts = displayName.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
+}
+
 const openedFromPasswordRecovery = typeof window !== "undefined" && (
   new URLSearchParams(window.location.search).get("recovery") === "1"
   || new URLSearchParams(window.location.hash.slice(1)).get("type") === "recovery"
@@ -401,7 +409,9 @@ export default function Home() {
       <header className="topbar">
         <div className="brand"><span className="brand-mark">SC</span>
           <span><b>Steadfast &amp; Co.</b><small>Cleaning</small></span></div>
-        <button className="avatar" aria-label="Open account menu">{role === "owner" ? "JD" : "MR"}</button>
+        <button className="avatar" aria-label={`Account for ${account?.full_name || "signed-in user"}`}>
+          {initialsFor(account?.full_name)}
+        </button>
       </header>
       <div className="demo-bar">
         <span><i /> {isSupabaseConfigured ? `Signed in as ${account?.full_name}` : "Preview mode"}</span>

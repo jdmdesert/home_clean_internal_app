@@ -24,6 +24,7 @@ All notable changes to the Steadfast & Co. Cleaning Team App are recorded here.
 
 - Connected the app to Supabase authentication and database records.
 - Added owner and employee roles with two initial pilot seats for each role.
+- Replaced demo avatar initials with initials generated from the signed-in user's profile.
 - Added sign-in, sign-out, forgot-password, and new-password screens.
 - Corrected password-recovery redirects and browser recovery-session handling.
 - Added safeguards against indefinite authentication loading on mobile devices.
