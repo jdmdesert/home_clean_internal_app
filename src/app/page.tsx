@@ -274,6 +274,23 @@ export default function Home() {
     setToast(message);
     setTimeout(() => setToast(""), 3500);
   }
+  async function signOut() {
+    if (!supabase) return;
+    setAccountMenuOpen(false);
+    setEditingProfile(false);
+    setShowRegistration(false);
+    setAccount(null);
+    setSession(null);
+    setAppError("");
+    setLoading(false);
+    const { error } = await supabase.auth.signOut({ scope: "local" });
+    if (error) {
+      setAppError(error.message);
+      const { data } = await supabase.auth.getSession();
+      setSession(data.session);
+      if (data.session) await loadProductionData(data.session);
+    }
+  }
   async function claim(id: string) {
     if (supabase && session) {
       const { data, error } = await supabase.rpc("claim_work_block", { block_id: id });
@@ -481,7 +498,7 @@ export default function Home() {
   if (isSupabaseConfigured && !session) return <LoginScreen />;
   if (isSupabaseConfigured && (!account || appError)) return <div className="auth-shell"><div className="auth-card">
     <h1>{spanish ? (account ? "La aplicación necesita atención" : "Se requiere configurar la cuenta") : (account ? "App access needs attention" : "Account setup needed")}</h1><p>{appError}</p>
-    <button className="secondary" onClick={() => void supabase?.auth.signOut()}>{spanish ? "Cerrar sesión" : "Sign out"}</button>
+    <button className="secondary" onClick={() => void signOut()}>{spanish ? "Cerrar sesión" : "Sign out"}</button>
   </div></div>;
 
   return (
@@ -505,7 +522,7 @@ export default function Home() {
               <div className="account-menu-heading"><b>{account?.full_name}</b><span>{account?.email || session?.user.email}</span></div>
               <button onClick={() => { setEditingProfile(true); setAccountMenuOpen(false); }}>{spanish ? "Editar información personal" : "Edit personal information"}</button>
               <NotificationButton compact />
-              <button className="account-signout" onClick={() => void supabase?.auth.signOut()}>{spanish ? "Cerrar sesión" : "Log out"}</button>
+              <button className="account-signout" onClick={() => void signOut()}>{spanish ? "Cerrar sesión" : "Log out"}</button>
             </div>}
           </div>
         </div>
