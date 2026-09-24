@@ -568,10 +568,38 @@ function ProfileSettings({ account, sessionEmail, onClose, onSave }: {
 }
 
 function LoginScreen() {
+  type LoginLanguage = "en" | "es";
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [forgotMode, setForgotMode] = useState(false);
   const [resetSent, setResetSent] = useState(false);
+  const [language, setLanguage] = useState<LoginLanguage>("en");
+  useEffect(() => {
+    const saved = window.localStorage.getItem("steadfast-language");
+    const selected: LoginLanguage = saved === "es" ? "es" : "en";
+    queueMicrotask(() => setLanguage(selected));
+    document.documentElement.lang = selected;
+  }, []);
+  const copy = language === "es" ? {
+    welcome: "Bienvenido de nuevo", intro: "Inicia sesión con la cuenta proporcionada por el propietario.",
+    email: "Correo electrónico", password: "Contraseña", signIn: "Iniciar sesión", signingIn: "Iniciando sesión…",
+    forgot: "¿Olvidaste tu contraseña?", recovery: "RECUPERACIÓN DE CUENTA", reset: "Restablece tu contraseña",
+    resetIntro: "Ingresa tu correo de trabajo y te enviaremos un enlace seguro.", send: "Enviar enlace",
+    sending: "Enviando…", back: "Volver a iniciar sesión", check: "Revisa tu correo",
+    sent: "Si existe una cuenta con esa dirección, recibirás un enlace para restablecer la contraseña.",
+  } : {
+    welcome: "Welcome back", intro: "Sign in with the account provided by the owner.",
+    email: "Email", password: "Password", signIn: "Sign in", signingIn: "Signing in…",
+    forgot: "Forgot password?", recovery: "ACCOUNT RECOVERY", reset: "Reset your password",
+    resetIntro: "Enter your work email and we’ll send you a secure reset link.", send: "Send reset link",
+    sending: "Sending…", back: "Back to sign in", check: "Check your email",
+    sent: "If an account exists for that address, a password-reset link is on its way.",
+  };
+  function chooseLanguage(next: LoginLanguage) {
+    setLanguage(next);
+    window.localStorage.setItem("steadfast-language", next);
+    document.documentElement.lang = next;
+  }
   async function signIn(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!supabase) return;
@@ -597,24 +625,28 @@ function LoginScreen() {
   }
   return <main className="auth-shell"><section className="auth-card">
     <div className="brand"><span className="brand-mark">SC</span><span><b>Steadfast &amp; Co.</b><small>Cleaning</small></span></div>
+    <div className="auth-language" aria-label="Choose language">
+      <button className={language === "en" ? "active" : ""} lang="en" onClick={() => chooseLanguage("en")}>English</button>
+      <button className={language === "es" ? "active" : ""} lang="es" onClick={() => chooseLanguage("es")}>Español</button>
+    </div>
     {forgotMode ? <>
-      <p className="eyebrow">ACCOUNT RECOVERY</p><h1>Reset your password</h1>
-      {resetSent ? <div className="auth-success"><b>Check your email</b><p>If an account exists for that address, a password-reset link is on its way.</p></div>
-        : <><p>Enter your work email and we’ll send you a secure reset link.</p>
-          <form onSubmit={requestReset}><label>Email<input name="email" type="email" autoComplete="email" required /></label>
+      <p className="eyebrow">{copy.recovery}</p><h1>{copy.reset}</h1>
+      {resetSent ? <div className="auth-success"><b>{copy.check}</b><p>{copy.sent}</p></div>
+        : <><p>{copy.resetIntro}</p>
+          <form onSubmit={requestReset}><label>{copy.email}<input name="email" type="email" autoComplete="email" required /></label>
             {error && <p className="form-error">{error}</p>}
-            <button className="primary" disabled={submitting}>{submitting ? "Sending…" : "Send reset link"}</button>
+            <button className="primary" disabled={submitting}>{submitting ? copy.sending : copy.send}</button>
           </form></>}
-      <button className="auth-link" onClick={() => { setForgotMode(false); setResetSent(false); setError(""); }}>Back to sign in</button>
+      <button className="auth-link" onClick={() => { setForgotMode(false); setResetSent(false); setError(""); }}>{copy.back}</button>
     </> : <>
-      <h1>Welcome back</h1>
-      <p>Sign in with the account provided by the owner.</p>
-      <form onSubmit={signIn}><label>Email<input name="email" type="email" autoComplete="email" required /></label>
-        <label>Password<input name="password" type="password" autoComplete="current-password" required /></label>
+      <h1>{copy.welcome}</h1>
+      <p>{copy.intro}</p>
+      <form onSubmit={signIn}><label>{copy.email}<input name="email" type="email" autoComplete="email" required /></label>
+        <label>{copy.password}<input name="password" type="password" autoComplete="current-password" required /></label>
         {error && <p className="form-error">{error}</p>}
-        <button className="primary" disabled={submitting}>{submitting ? "Signing in…" : "Sign in"}</button>
+        <button className="primary" disabled={submitting}>{submitting ? copy.signingIn : copy.signIn}</button>
       </form>
-      <button className="auth-link" onClick={() => { setForgotMode(true); setError(""); }}>Forgot password?</button>
+      <button className="auth-link" onClick={() => { setForgotMode(true); setError(""); }}>{copy.forgot}</button>
     </>}
   </section></main>;
 }
