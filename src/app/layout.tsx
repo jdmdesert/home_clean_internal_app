@@ -3,9 +3,10 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Steadfast & Co. Cleaning | Team App",
+  applicationName: "Steadfast & Co.",
   description: "Work scheduling for the Steadfast & Co. Cleaning team.",
   manifest: "/manifest.webmanifest",
-  appleWebApp: { capable: true, statusBarStyle: "black-translucent", title: "Steadfast Cleaning" },
+  appleWebApp: { capable: true, statusBarStyle: "black-translucent", title: "Steadfast & Co." },
 };
 
 export const viewport: Viewport = {

@@ -72,6 +72,7 @@ All notable changes to the Steadfast & Co. Cleaning Team App are recorded here.
 - Updated the signed-in header to welcome the user by first name and show their first/last initials.
 - Added an account menu with personal-information editing, notification enrollment, and logout.
 - Added a secure self-service profile update database function for owners and employees.
+- Shortened the iOS and Android Home Screen app name to `Steadfast & Co.`.
 
 ### Development and mobile preview
 
