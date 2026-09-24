@@ -80,6 +80,7 @@ All notable changes to the Steadfast & Co. Cleaning Team App are recorded here.
 - Extended the saved language preference through the signed-in employee work board, job details, profile settings, onboarding, and notification controls.
 - Ensured the account menu starts closed after login, opens only from the initials avatar, and closes when tapping elsewhere.
 - Made sign-out return immediately to the login screen on mobile while Supabase securely clears the saved local session.
+- Prevented mobile Safari from restoring a stale Supabase session immediately after logout.
 - Added a compact English/Spanish selector to the signed-in header so users can change the entire app language at any time; the choice remains saved for future launches.
 
 ### Development and mobile preview

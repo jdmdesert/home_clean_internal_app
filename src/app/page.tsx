@@ -276,6 +276,11 @@ export default function Home() {
   }
   async function signOut() {
     if (!supabase) return;
+    const clearLocalAuth = () => {
+      Object.keys(window.localStorage)
+        .filter((key) => key.startsWith("sb-") && key.endsWith("-auth-token"))
+        .forEach((key) => window.localStorage.removeItem(key));
+    };
     setAccountMenuOpen(false);
     setEditingProfile(false);
     setShowRegistration(false);
@@ -283,12 +288,16 @@ export default function Home() {
     setSession(null);
     setAppError("");
     setLoading(false);
-    const { error } = await supabase.auth.signOut({ scope: "local" });
-    if (error) {
-      setAppError(error.message);
-      const { data } = await supabase.auth.getSession();
-      setSession(data.session);
-      if (data.session) await loadProductionData(data.session);
+    try {
+      await Promise.race([
+        supabase.auth.signOut(),
+        new Promise((resolve) => window.setTimeout(resolve, 2000)),
+      ]);
+    } finally {
+      clearLocalAuth();
+      setAccount(null);
+      setSession(null);
+      window.location.replace(window.location.origin);
     }
   }
   async function claim(id: string) {
