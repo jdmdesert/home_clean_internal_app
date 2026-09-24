@@ -18,7 +18,11 @@ type WorkBlock = {
   status: Status; claimedBy?: string;
 };
 
-type AccountProfile = { id: string; full_name: string; role: Role; active: boolean; onboarding_complete: boolean };
+type AccountProfile = {
+  id: string; full_name: string; first_name: string | null; last_name: string | null;
+  email: string | null; phone: string | null; address: string | null;
+  preferred_language: string | null; role: Role; active: boolean; onboarding_complete: boolean;
+};
 type WorkBlockRow = {
   id: string; title: string; starts_at: string; ends_at: string; city: string;
   postal_code: string; square_feet: number; occupancy: "vacant" | "occupied";
@@ -103,6 +107,17 @@ function initialsFor(name?: string) {
   return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
 }
 
+function accountInitials(account: AccountProfile | null) {
+  const first = account?.first_name?.trim();
+  const last = account?.last_name?.trim();
+  if (first && last) return `${first[0]}${last[0]}`.toUpperCase();
+  return initialsFor(account?.full_name);
+}
+
+function firstNameFor(account: AccountProfile | null) {
+  return account?.first_name?.trim() || account?.full_name?.trim().split(/\s+/)[0] || "there";
+}
+
 const openedFromPasswordRecovery = typeof window !== "undefined" && (
   new URLSearchParams(window.location.search).get("recovery") === "1"
   || new URLSearchParams(window.location.hash.slice(1)).get("type") === "recovery"
@@ -123,12 +138,14 @@ export default function Home() {
   const [loading, setLoading] = useState(isSupabaseConfigured);
   const [appError, setAppError] = useState("");
   const [recoveringPassword, setRecoveringPassword] = useState(false);
+  const [accountMenuOpen, setAccountMenuOpen] = useState(false);
+  const [editingProfile, setEditingProfile] = useState(false);
 
   async function loadProductionData(currentSession: Session) {
     if (!supabase) return;
     setAppError("");
     const { data: profile, error: profileError } = await supabase
-      .from("profiles").select("id, full_name, role, active, onboarding_complete").eq("id", currentSession.user.id).single();
+      .from("profiles").select("id, full_name, first_name, last_name, email, phone, address, preferred_language, role, active, onboarding_complete").eq("id", currentSession.user.id).single();
     if (profileError || !profile) {
       setAppError("This account has not been added to the cleaning team yet.");
       setLoading(false);
@@ -433,6 +450,28 @@ export default function Home() {
     notify(active ? "Employee account reactivated." : "Employee account deactivated.");
   }
 
+  async function updateOwnProfile(values: { firstName: string; lastName: string; email: string; phone: string; address: string; language: string }) {
+    if (!supabase || !session) return "Please sign in again.";
+    const nextEmail = values.email.trim().toLowerCase();
+    const currentEmail = session.user.email?.toLowerCase() || account?.email?.toLowerCase();
+    if (nextEmail && nextEmail !== currentEmail) {
+      const { error: emailError } = await supabase.auth.updateUser({ email: nextEmail });
+      if (emailError) return emailError.message;
+    }
+    const { error } = await supabase.rpc("update_own_profile", {
+      first_name_input: values.firstName, last_name_input: values.lastName,
+      email_input: nextEmail, phone_input: values.phone, address_input: values.address,
+      language_input: values.language,
+    });
+    if (error) return error.message;
+    await loadProductionData(session);
+    setEditingProfile(false);
+    setAccountMenuOpen(false);
+    notify(nextEmail !== currentEmail
+      ? "Profile saved. Check your new email address to confirm the change."
+      : "Profile updated.");
+  }
+
   if (recoveringPassword) return <ResetPasswordScreen onDone={() => setRecoveringPassword(false)} />;
   if (loading) return <div className="auth-shell"><div className="auth-card"><h1>Loading work board…</h1></div></div>;
   if (isSupabaseConfigured && !session) return <LoginScreen />;
@@ -446,12 +485,21 @@ export default function Home() {
       <header className="topbar">
         <div className="brand"><span className="brand-mark">SC</span>
           <span><b>Steadfast &amp; Co.</b><small>Cleaning</small></span></div>
-        <button className="avatar" aria-label={`Account for ${account?.full_name || "signed-in user"}`}>
-          {initialsFor(account?.full_name)}
-        </button>
+        <div className="account-menu-wrap">
+          <button className="avatar" aria-label={`Account menu for ${account?.full_name || "signed-in user"}`}
+            aria-expanded={accountMenuOpen} onClick={() => setAccountMenuOpen((open) => !open)}>
+            {accountInitials(account)}
+          </button>
+          {accountMenuOpen && <div className="account-menu">
+            <div className="account-menu-heading"><b>{account?.full_name}</b><span>{account?.email || session?.user.email}</span></div>
+            <button onClick={() => { setEditingProfile(true); setAccountMenuOpen(false); }}>Edit personal information</button>
+            <NotificationButton compact />
+            <button className="account-signout" onClick={() => void supabase?.auth.signOut()}>Log out</button>
+          </div>}
+        </div>
       </header>
       <div className="demo-bar">
-        <span><i /> {isSupabaseConfigured ? `Signed in as ${account?.full_name}` : "Preview mode"}</span>
+        <span><i /> {isSupabaseConfigured ? `Welcome ${firstNameFor(account)}!` : "Preview mode"}</span>
         {!isSupabaseConfigured && <>
         <div className="role-switch">
           <button className={role === "employee" ? "active" : ""} onClick={() => setRole("employee")}>Employee</button>
@@ -459,7 +507,6 @@ export default function Home() {
         </div>
         {role === "employee" && <button className="signup-preview" onClick={() => setShowRegistration(true)}>Preview registration</button>}
         </>}
-        {isSupabaseConfigured && <button className="signup-preview" onClick={() => void supabase?.auth.signOut()}>Sign out</button>}
       </div>
       {role === "employee" ? (showRegistration
         ? <EmployeeRegistration onComplete={completeRegistration} onCancel={() => setShowRegistration(false)} />
@@ -471,9 +518,53 @@ export default function Home() {
       {showForm && <CreateBlock onClose={() => setShowForm(false)} onCreate={createBlock} />}
       {editingBlock && <CreateBlock key={editingBlock.id} initialBlock={editingBlock}
         onClose={() => setEditingBlock(null)} onCreate={updateBlock} />}
+      {editingProfile && account && <ProfileSettings account={account} sessionEmail={session?.user.email || ""}
+        onClose={() => setEditingProfile(false)} onSave={updateOwnProfile} />}
       {toast && <div className="toast"><span>✓</span>{toast}</div>}
     </main>
   );
+}
+
+function ProfileSettings({ account, sessionEmail, onClose, onSave }: {
+  account: AccountProfile; sessionEmail: string; onClose: () => void;
+  onSave: (values: { firstName: string; lastName: string; email: string; phone: string; address: string; language: string }) => Promise<string | void>;
+}) {
+  const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setSaving(true); setError("");
+    const data = new FormData(event.currentTarget);
+    const result = await onSave({
+      firstName: String(data.get("firstName")).trim(), lastName: String(data.get("lastName")).trim(),
+      email: String(data.get("email")).trim(), phone: String(data.get("phone")).trim(),
+      address: String(data.get("address")).trim(), language: String(data.get("language")),
+    });
+    if (result) setError(result);
+    setSaving(false);
+  }
+  const nameParts = account.full_name.trim().split(/\s+/);
+  return <div className="modal-backdrop" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
+    <section className="modal profile-settings-modal">
+      <button className="close" aria-label="Close profile settings" onClick={onClose}>×</button>
+      <p className="eyebrow">MY ACCOUNT</p><h2>Personal information</h2>
+      <p className="form-intro">Keep your contact information current.</p>
+      <form onSubmit={submit}>
+        <label>First name<input name="firstName" defaultValue={account.first_name || nameParts[0] || ""} required /></label>
+        <label>Last name<input name="lastName" defaultValue={account.last_name || nameParts.slice(1).join(" ")} required /></label>
+        <label className="wide">Email address<input name="email" type="email" defaultValue={account.email || sessionEmail} required />
+          <small className="field-note">Changing your email may require confirmation from your new address.</small></label>
+        <label>Phone number<input name="phone" type="tel" autoComplete="tel" defaultValue={account.phone || ""} /></label>
+        <label>Preferred language<select name="language" defaultValue={account.preferred_language || "English"}>
+          <option>English</option><option>Español</option>
+        </select></label>
+        <label className="wide">Home address<input name="address" autoComplete="street-address" defaultValue={account.address || ""} /></label>
+        {error && <p className="form-error wide">{error}</p>}
+        <div className="form-actions"><button type="button" className="secondary" onClick={onClose}>Cancel</button>
+          <button className="primary" disabled={saving}>{saving ? "Saving…" : "Save changes"}</button></div>
+      </form>
+    </section>
+  </div>;
 }
 
 function LoginScreen() {

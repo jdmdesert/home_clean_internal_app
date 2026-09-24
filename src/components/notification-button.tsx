@@ -9,7 +9,7 @@ function decodeVapidKey(value: string) {
   return Uint8Array.from(atob(base64), (character) => character.charCodeAt(0));
 }
 
-export function NotificationButton() {
+export function NotificationButton({ compact = false }: { compact?: boolean }) {
   const [message, setMessage] = useState("");
   const [working, setWorking] = useState(false);
   const [enabled, setEnabled] = useState(false);
@@ -53,7 +53,7 @@ export function NotificationButton() {
     } finally { setWorking(false); }
   }
 
-  return <div className="notification-optin">
+  return <div className={`notification-optin${compact ? " compact-optin" : ""}`}>
     <button className="secondary" onClick={enable} disabled={working || enabled}>
       {working ? "Enabling…" : enabled ? "Notifications enabled" : "Enable notifications"}
     </button>

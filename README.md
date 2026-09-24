@@ -90,6 +90,16 @@ last name, and email address. Before using invitations in production:
 4. Keep `https://steadfast-cleaning.netlify.app/**` in the Supabase authentication redirect allow list.
 
 The iOS and Android email buttons use the same secure, single-use Supabase invitation.
+
+### Account settings and notifications
+
+Run [`supabase/profile_settings_upgrade.sql`](supabase/profile_settings_upgrade.sql) once in the
+Supabase SQL Editor to enable signed-in owners and employees to update their own contact details.
+
+Browser push notifications require these additional Netlify environment variables:
+`NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, and `VAPID_SUBJECT`. The subject should be a
+company contact such as `mailto:info@example.com`. After adding them, redeploy the site and install
+the app on the phone before selecting **Enable notifications** from the account menu.
 After opening it, the employee creates a password, completes their profile, installs the
 PWA using their browser, and enables notifications on that device.
 

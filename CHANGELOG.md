@@ -69,6 +69,9 @@ All notable changes to the Steadfast & Co. Cleaning Team App are recorded here.
 - Added a safe migration for the original `admin` and `cleaner` profile roles.
 - Added an owner-only database policy for deleting work blocks.
 - Removed the duplicate production `SUPABASE_URL` requirement so Netlify does not flag the intentionally public project URL as a leaked secret.
+- Updated the signed-in header to welcome the user by first name and show their first/last initials.
+- Added an account menu with personal-information editing, notification enrollment, and logout.
+- Added a secure self-service profile update database function for owners and employees.
 
 ### Development and mobile preview
 
