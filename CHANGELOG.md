@@ -74,6 +74,7 @@ All notable changes to the Steadfast & Co. Cleaning Team App are recorded here.
 - Added a secure self-service profile update database function for owners and employees.
 - Shortened the iOS and Android Home Screen app name to `Steadfast & Co.`.
 - Added a compact English/Spanish selector to sign-in and password recovery, with the device preference saved for future launches.
+- Extended the saved language preference through the signed-in employee work board, job details, profile settings, onboarding, and notification controls.
 
 ### Development and mobile preview
 

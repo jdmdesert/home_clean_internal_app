@@ -2,6 +2,7 @@
 
 import { FormEvent, useState } from "react";
 import { createId } from "@/lib/create-id";
+import { useAppLanguage } from "@/lib/language";
 
 export type EmployeeStanding = "new" | "good" | "watch" | "risk";
 
@@ -31,11 +32,12 @@ export type EmployeeProfile = {
   paidLifetime: number;
 };
 
-export function EmployeeRegistration({ onComplete, onCancel }: {
+export function EmployeeRegistration({ onComplete }: {
   onComplete: (employee: EmployeeProfile, password: string) => Promise<string | void> | string | void;
   onCancel?: () => void;
 }) {
-  const [language, setLanguage] = useState<"English" | "Español" | null>(null);
+  const { language: appLanguage, setLanguage: setAppLanguage } = useAppLanguage();
+  const language: "English" | "Español" = appLanguage === "es" ? "Español" : "English";
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const spanish = language === "Español";
@@ -61,7 +63,6 @@ export function EmployeeRegistration({ onComplete, onCancel }: {
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!language) return;
     const data = new FormData(event.currentTarget);
     const method = String(data.get("paymentMethod")) as EmployeeProfile["paymentMethod"];
     const firstName = String(data.get("firstName")).trim();
@@ -84,25 +85,12 @@ export function EmployeeRegistration({ onComplete, onCancel }: {
     setSubmitting(false);
   }
 
-  if (!language) {
-    return <section className="registration-shell">
-      <div className="language-card">
-        <div className="registration-logo">SC</div>
-        <p className="eyebrow">WELCOME · BIENVENIDO</p>
-        <h1>Choose your language</h1>
-        <p>Elige tu idioma</p>
-        <div className="language-options">
-          <button onClick={() => setLanguage("English")}><b>English</b><span>Continue in English →</span></button>
-          <button onClick={() => setLanguage("Español")}><b>Español</b><span>Continuar en español →</span></button>
-        </div>
-        {onCancel && <button className="text-button" onClick={onCancel}>Return to preview</button>}
-      </div>
-    </section>;
-  }
-
   return <section className="registration-shell">
     <div className="registration-card">
-      <button className="registration-back" onClick={() => setLanguage(null)}>← {copy.back}</button>
+      <div className="auth-language registration-language">
+        <button className={!spanish ? "active" : ""} onClick={() => setAppLanguage("en")}>English</button>
+        <button className={spanish ? "active" : ""} onClick={() => setAppLanguage("es")}>Español</button>
+      </div>
       <p className="eyebrow">{copy.eyebrow}</p><h1>{copy.title}</h1><p>{copy.intro}</p>
       <form onSubmit={submit}>
         <label>{copy.firstName}<input name="firstName" autoComplete="given-name" required /></label>

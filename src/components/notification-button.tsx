@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { useAppLanguage } from "@/lib/language";
 
 function decodeVapidKey(value: string) {
   const padding = "=".repeat((4 - value.length % 4) % 4);
@@ -10,6 +11,7 @@ function decodeVapidKey(value: string) {
 }
 
 export function NotificationButton({ compact = false }: { compact?: boolean }) {
+  const { spanish } = useAppLanguage();
   const [message, setMessage] = useState("");
   const [working, setWorking] = useState(false);
   const [enabled, setEnabled] = useState(false);
@@ -25,13 +27,13 @@ export function NotificationButton({ compact = false }: { compact?: boolean }) {
 
   async function enable() {
     if (!supabase || !publicKey || !("serviceWorker" in navigator) || !("PushManager" in window)) {
-      setMessage("Notifications are not configured on this device yet.");
+      setMessage(spanish ? "Las notificaciones aún no están configuradas en este dispositivo." : "Notifications are not configured on this device yet.");
       return;
     }
     setWorking(true); setMessage("");
     try {
       const permission = await Notification.requestPermission();
-      if (permission !== "granted") throw new Error("Notification permission was not granted.");
+      if (permission !== "granted") throw new Error(spanish ? "No se concedió permiso para notificaciones." : "Notification permission was not granted.");
       const registration = await navigator.serviceWorker.ready;
       const subscription = await registration.pushManager.subscribe({
         userVisibleOnly: true,
@@ -47,15 +49,15 @@ export function NotificationButton({ compact = false }: { compact?: boolean }) {
       }, { onConflict: "endpoint" });
       if (error) throw error;
       setEnabled(true);
-      setMessage("Notifications enabled on this device.");
+      setMessage(spanish ? "Notificaciones activadas en este dispositivo." : "Notifications enabled on this device.");
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Notifications could not be enabled.");
+      setMessage(error instanceof Error ? error.message : (spanish ? "No se pudieron activar las notificaciones." : "Notifications could not be enabled."));
     } finally { setWorking(false); }
   }
 
   return <div className={`notification-optin${compact ? " compact-optin" : ""}`}>
     <button className="secondary" onClick={enable} disabled={working || enabled}>
-      {working ? "Enabling…" : enabled ? "Notifications enabled" : "Enable notifications"}
+      {working ? (spanish ? "Activando…" : "Enabling…") : enabled ? (spanish ? "Notificaciones activadas" : "Notifications enabled") : (spanish ? "Activar notificaciones" : "Enable notifications")}
     </button>
     {message && <small>{message}</small>}
   </div>;

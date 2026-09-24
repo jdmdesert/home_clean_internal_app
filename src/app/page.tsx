@@ -5,6 +5,7 @@ import { EmployeeDirectory } from "@/components/employee-directory";
 import { EmployeeRegistration, type EmployeeProfile } from "@/components/employee-registration";
 import { NotificationButton } from "@/components/notification-button";
 import { createId } from "@/lib/create-id";
+import { useAppLanguage } from "@/lib/language";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase";
 import type { Session } from "@supabase/supabase-js";
 
@@ -124,6 +125,7 @@ const openedFromPasswordRecovery = typeof window !== "undefined" && (
 );
 
 export default function Home() {
+  const { spanish, setLanguage: setPreferredLanguage } = useAppLanguage();
   const [role, setRole] = useState<Role>("employee");
   const [blocks, setBlocks] = useState<WorkBlock[]>(seedBlocks);
   const [tab, setTab] = useState<"available" | "mine">("available");
@@ -464,6 +466,7 @@ export default function Home() {
       language_input: values.language,
     });
     if (error) return error.message;
+    setPreferredLanguage(values.language === "Español" ? "es" : "en");
     await loadProductionData(session);
     setEditingProfile(false);
     setAccountMenuOpen(false);
@@ -473,11 +476,11 @@ export default function Home() {
   }
 
   if (recoveringPassword) return <ResetPasswordScreen onDone={() => setRecoveringPassword(false)} />;
-  if (loading) return <div className="auth-shell"><div className="auth-card"><h1>Loading work board…</h1></div></div>;
+  if (loading) return <div className="auth-shell"><div className="auth-card"><h1>{spanish ? "Cargando tablero…" : "Loading work board…"}</h1></div></div>;
   if (isSupabaseConfigured && !session) return <LoginScreen />;
   if (isSupabaseConfigured && (!account || appError)) return <div className="auth-shell"><div className="auth-card">
-    <h1>{account ? "App access needs attention" : "Account setup needed"}</h1><p>{appError}</p>
-    <button className="secondary" onClick={() => void supabase?.auth.signOut()}>Sign out</button>
+    <h1>{spanish ? (account ? "La aplicación necesita atención" : "Se requiere configurar la cuenta") : (account ? "App access needs attention" : "Account setup needed")}</h1><p>{appError}</p>
+    <button className="secondary" onClick={() => void supabase?.auth.signOut()}>{spanish ? "Cerrar sesión" : "Sign out"}</button>
   </div></div>;
 
   return (
@@ -492,14 +495,14 @@ export default function Home() {
           </button>
           {accountMenuOpen && <div className="account-menu">
             <div className="account-menu-heading"><b>{account?.full_name}</b><span>{account?.email || session?.user.email}</span></div>
-            <button onClick={() => { setEditingProfile(true); setAccountMenuOpen(false); }}>Edit personal information</button>
+            <button onClick={() => { setEditingProfile(true); setAccountMenuOpen(false); }}>{spanish ? "Editar información personal" : "Edit personal information"}</button>
             <NotificationButton compact />
-            <button className="account-signout" onClick={() => void supabase?.auth.signOut()}>Log out</button>
+            <button className="account-signout" onClick={() => void supabase?.auth.signOut()}>{spanish ? "Cerrar sesión" : "Log out"}</button>
           </div>}
         </div>
       </header>
       <div className="demo-bar">
-        <span><i /> {isSupabaseConfigured ? `Welcome ${firstNameFor(account)}!` : "Preview mode"}</span>
+        <span><i /> {isSupabaseConfigured ? `${spanish ? "¡Bienvenido" : "Welcome"} ${firstNameFor(account)}!` : (spanish ? "Modo de vista previa" : "Preview mode")}</span>
         {!isSupabaseConfigured && <>
         <div className="role-switch">
           <button className={role === "employee" ? "active" : ""} onClick={() => setRole("employee")}>Employee</button>
@@ -529,6 +532,7 @@ function ProfileSettings({ account, sessionEmail, onClose, onSave }: {
   account: AccountProfile; sessionEmail: string; onClose: () => void;
   onSave: (values: { firstName: string; lastName: string; email: string; phone: string; address: string; language: string }) => Promise<string | void>;
 }) {
+  const { spanish } = useAppLanguage();
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -547,39 +551,32 @@ function ProfileSettings({ account, sessionEmail, onClose, onSave }: {
   return <div className="modal-backdrop" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
     <section className="modal profile-settings-modal">
       <button className="close" aria-label="Close profile settings" onClick={onClose}>×</button>
-      <p className="eyebrow">MY ACCOUNT</p><h2>Personal information</h2>
-      <p className="form-intro">Keep your contact information current.</p>
+      <p className="eyebrow">{spanish ? "MI CUENTA" : "MY ACCOUNT"}</p><h2>{spanish ? "Información personal" : "Personal information"}</h2>
+      <p className="form-intro">{spanish ? "Mantén actualizada tu información de contacto." : "Keep your contact information current."}</p>
       <form onSubmit={submit}>
-        <label>First name<input name="firstName" defaultValue={account.first_name || nameParts[0] || ""} required /></label>
-        <label>Last name<input name="lastName" defaultValue={account.last_name || nameParts.slice(1).join(" ")} required /></label>
-        <label className="wide">Email address<input name="email" type="email" defaultValue={account.email || sessionEmail} required />
-          <small className="field-note">Changing your email may require confirmation from your new address.</small></label>
-        <label>Phone number<input name="phone" type="tel" autoComplete="tel" defaultValue={account.phone || ""} /></label>
-        <label>Preferred language<select name="language" defaultValue={account.preferred_language || "English"}>
+        <label>{spanish ? "Nombre" : "First name"}<input name="firstName" defaultValue={account.first_name || nameParts[0] || ""} required /></label>
+        <label>{spanish ? "Apellido" : "Last name"}<input name="lastName" defaultValue={account.last_name || nameParts.slice(1).join(" ")} required /></label>
+        <label className="wide">{spanish ? "Correo electrónico" : "Email address"}<input name="email" type="email" defaultValue={account.email || sessionEmail} required />
+          <small className="field-note">{spanish ? "Cambiar el correo puede requerir confirmación." : "Changing your email may require confirmation from your new address."}</small></label>
+        <label>{spanish ? "Teléfono" : "Phone number"}<input name="phone" type="tel" autoComplete="tel" defaultValue={account.phone || ""} /></label>
+        <label>{spanish ? "Idioma preferido" : "Preferred language"}<select name="language" defaultValue={account.preferred_language || "English"}>
           <option>English</option><option>Español</option>
         </select></label>
-        <label className="wide">Home address<input name="address" autoComplete="street-address" defaultValue={account.address || ""} /></label>
+        <label className="wide">{spanish ? "Dirección" : "Home address"}<input name="address" autoComplete="street-address" defaultValue={account.address || ""} /></label>
         {error && <p className="form-error wide">{error}</p>}
-        <div className="form-actions"><button type="button" className="secondary" onClick={onClose}>Cancel</button>
-          <button className="primary" disabled={saving}>{saving ? "Saving…" : "Save changes"}</button></div>
+        <div className="form-actions"><button type="button" className="secondary" onClick={onClose}>{spanish ? "Cancelar" : "Cancel"}</button>
+          <button className="primary" disabled={saving}>{saving ? (spanish ? "Guardando…" : "Saving…") : (spanish ? "Guardar cambios" : "Save changes")}</button></div>
       </form>
     </section>
   </div>;
 }
 
 function LoginScreen() {
-  type LoginLanguage = "en" | "es";
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [forgotMode, setForgotMode] = useState(false);
   const [resetSent, setResetSent] = useState(false);
-  const [language, setLanguage] = useState<LoginLanguage>("en");
-  useEffect(() => {
-    const saved = window.localStorage.getItem("steadfast-language");
-    const selected: LoginLanguage = saved === "es" ? "es" : "en";
-    queueMicrotask(() => setLanguage(selected));
-    document.documentElement.lang = selected;
-  }, []);
+  const { language, setLanguage } = useAppLanguage();
   const copy = language === "es" ? {
     welcome: "Bienvenido de nuevo", intro: "Inicia sesión con la cuenta proporcionada por el propietario.",
     email: "Correo electrónico", password: "Contraseña", signIn: "Iniciar sesión", signingIn: "Iniciando sesión…",
@@ -595,11 +592,6 @@ function LoginScreen() {
     sending: "Sending…", back: "Back to sign in", check: "Check your email",
     sent: "If an account exists for that address, a password-reset link is on its way.",
   };
-  function chooseLanguage(next: LoginLanguage) {
-    setLanguage(next);
-    window.localStorage.setItem("steadfast-language", next);
-    document.documentElement.lang = next;
-  }
   async function signIn(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!supabase) return;
@@ -626,8 +618,8 @@ function LoginScreen() {
   return <main className="auth-shell"><section className="auth-card">
     <div className="brand"><span className="brand-mark">SC</span><span><b>Steadfast &amp; Co.</b><small>Cleaning</small></span></div>
     <div className="auth-language" aria-label="Choose language">
-      <button className={language === "en" ? "active" : ""} lang="en" onClick={() => chooseLanguage("en")}>English</button>
-      <button className={language === "es" ? "active" : ""} lang="es" onClick={() => chooseLanguage("es")}>Español</button>
+      <button className={language === "en" ? "active" : ""} lang="en" onClick={() => setLanguage("en")}>English</button>
+      <button className={language === "es" ? "active" : ""} lang="es" onClick={() => setLanguage("es")}>Español</button>
     </div>
     {forgotMode ? <>
       <p className="eyebrow">{copy.recovery}</p><h1>{copy.reset}</h1>
@@ -689,48 +681,50 @@ function EmployeeView({ blocks, availableCount, tab, setTab, claim }: {
   blocks: WorkBlock[]; availableCount: number; tab: "available" | "mine";
   setTab: (tab: "available" | "mine") => void; claim: (id: string) => void;
 }) {
+  const { spanish } = useAppLanguage();
   return <section className="page">
-    <div className="hero"><p className="eyebrow">MONDAY, JUNE 29</p>
-      <h1>Good afternoon, Maria.</h1>
-      <p>{availableCount ? `${availableCount} new work blocks are ready to claim.` : "You're all caught up for now."}</p>
+    <div className="hero"><p className="eyebrow">{spanish ? "TRABAJO DISPONIBLE" : "AVAILABLE WORK"}</p>
+      <h1>{spanish ? "Tu tablero de trabajo" : "Your work board"}</h1>
+      <p>{availableCount ? (spanish ? `${availableCount} trabajos nuevos están disponibles.` : `${availableCount} new work blocks are ready to claim.`) : (spanish ? "No tienes trabajos nuevos por ahora." : "You're all caught up for now.")}</p>
       {isSupabaseConfigured && <NotificationButton />}
     </div>
     <nav className="tabs">
       <button className={tab === "available" ? "active" : ""} onClick={() => setTab("available")}>
-        Available <span>{availableCount}</span></button>
-      <button className={tab === "mine" ? "active" : ""} onClick={() => setTab("mine")}>My work</button>
+        {spanish ? "Disponibles" : "Available"} <span>{availableCount}</span></button>
+      <button className={tab === "mine" ? "active" : ""} onClick={() => setTab("mine")}>{spanish ? "Mi trabajo" : "My work"}</button>
     </nav>
     <div className="job-grid">
       {blocks.length ? blocks.map((block) => <JobCard key={block.id} block={block} onClaim={claim} />)
-        : <div className="empty"><span>✓</span><h2>No blocks here</h2>
-          <p>We’ll notify you as soon as new work is posted.</p></div>}
+        : <div className="empty"><span>✓</span><h2>{spanish ? "No hay trabajos aquí" : "No blocks here"}</h2>
+          <p>{spanish ? "Te avisaremos cuando se publique trabajo nuevo." : "We’ll notify you as soon as new work is posted."}</p></div>}
     </div>
   </section>;
 }
 
 function JobCard({ block, onClaim }: { block: WorkBlock; onClaim: (id: string) => void }) {
+  const { spanish } = useAppLanguage();
   const claimed = block.status !== "open";
   return <article className="job-card">
-    <div className="job-top"><div><span className="status-pill">{claimed ? "YOUR WORK" : "AVAILABLE"}</span>
-      <h2>{block.title}</h2></div><strong className="pay">${block.pay}<small> total</small></strong></div>
+    <div className="job-top"><div><span className="status-pill">{claimed ? (spanish ? "TU TRABAJO" : "YOUR WORK") : (spanish ? "DISPONIBLE" : "AVAILABLE")}</span>
+      <h2>{block.title}</h2></div><strong className="pay">${block.pay}<small> {spanish ? "total" : "total"}</small></strong></div>
     <div className="facts">
       <p><span>▣</span><b>{day(block.date)}</b>
-        <small>Soonest arrival: {time(block.startTime)}<br />Latest departure: {time(block.endTime)}</small></p>
+        <small>{spanish ? "Llegada más temprana" : "Soonest arrival"}: {time(block.startTime)}<br />{spanish ? "Salida más tarde" : "Latest departure"}: {time(block.endTime)}</small></p>
       <p><span>⌖</span><b>{claimed ? block.address : `${block.city}, AZ ${block.zip}`}</b>
-        <small>{claimed ? "Full address unlocked" : "Exact address after acceptance"}</small></p>
+        <small>{claimed ? (spanish ? "Dirección completa disponible" : "Full address unlocked") : (spanish ? "Dirección exacta después de aceptar" : "Exact address after acceptance")}</small></p>
     </div>
     <div className="occupancy">
-      <span>□ {block.squareFeet.toLocaleString()} sq ft</span>
-      <span>{block.occupancy === "vacant" ? "⌂ Vacant home" : "⌂ Occupied home"}</span>
+      <span>□ {block.squareFeet.toLocaleString()} {spanish ? "pies²" : "sq ft"}</span>
+      <span>{block.occupancy === "vacant" ? (spanish ? "⌂ Casa vacía" : "⌂ Vacant home") : (spanish ? "⌂ Casa ocupada" : "⌂ Occupied home")}</span>
       {block.occupancy === "occupied" &&
-        <span>{block.ownersPresent ? "Owners will be present" : "Owners will not be present"}</span>}
+        <span>{block.ownersPresent ? (spanish ? "Los propietarios estarán presentes" : "Owners will be present") : (spanish ? "Los propietarios no estarán presentes" : "Owners will not be present")}</span>}
     </div>
     <div className="task-list">{block.details.map((detail) => <span key={detail}>✓ {detail}</span>)}</div>
     {claimed && <div className="private-details">
-      <b>Property access</b><p>{block.accessCodes || "No gate or keypad code provided."}</p>
-      {block.notes && <><b>Private notes</b><p>{block.notes}</p></>}
+      <b>{spanish ? "Acceso a la propiedad" : "Property access"}</b><p>{block.accessCodes || (spanish ? "No se proporcionó código de acceso." : "No gate or keypad code provided.")}</p>
+      {block.notes && <><b>{spanish ? "Notas privadas" : "Private notes"}</b><p>{block.notes}</p></>}
     </div>}
-    {!claimed && <button className="primary" onClick={() => onClaim(block.id)}>Accept work block</button>}
+    {!claimed && <button className="primary" onClick={() => onClaim(block.id)}>{spanish ? "Aceptar trabajo" : "Accept work block"}</button>}
   </article>;
 }
 
@@ -742,11 +736,12 @@ function OwnerView({ blocks, employees, alerts, onCreate, onEdit, onDelete, onAs
   onInviteEmployee: (firstName: string, lastName: string, email: string) => Promise<string | void>;
 }) {
   const [section, setSection] = useState<"work" | "employees">("work");
+  const { spanish } = useAppLanguage();
   return <section className="page">
     <nav className="owner-nav">
-      <button className={section === "work" ? "active" : ""} onClick={() => setSection("work")}>Work board</button>
+      <button className={section === "work" ? "active" : ""} onClick={() => setSection("work")}>{spanish ? "Tablero" : "Work board"}</button>
       <button className={section === "employees" ? "active" : ""} onClick={() => setSection("employees")}>
-        Employees <span>{employees.length}</span></button>
+        {spanish ? "Empleados" : "Employees"} <span>{employees.length}</span></button>
     </nav>
     {section === "employees"
       ? <EmployeeDirectory employees={employees} onSetActive={onSetEmployeeActive} onInvite={onInviteEmployee} />
@@ -760,25 +755,26 @@ function OwnerWorkBoard({ blocks, employees, alerts, onCreate, onEdit, onDelete,
   onEdit: (block: WorkBlock) => void; onDelete: (id: string) => void;
   onAssign: (id: string, employeeId: string) => void; onUnassign: (id: string) => void;
 }) {
+  const { spanish } = useAppLanguage();
   const counts = useMemo(() => ({
     open: blocks.filter((b) => b.status === "open").length,
     claimed: blocks.filter((b) => b.status === "claimed").length,
     payroll: blocks.filter((b) => b.status === "claimed").reduce((sum, b) => sum + b.pay, 0),
   }), [blocks]);
   return <>
-    <div className="owner-heading"><div><p className="eyebrow">OWNER DASHBOARD</p><h1>Work board</h1>
-      <p>Post work and see who claimed it.</p></div>
-      <button className="primary compact" onClick={onCreate}>＋ Post new work</button></div>
+    <div className="owner-heading"><div><p className="eyebrow">{spanish ? "PANEL DEL PROPIETARIO" : "OWNER DASHBOARD"}</p><h1>{spanish ? "Tablero de trabajo" : "Work board"}</h1>
+      <p>{spanish ? "Publica trabajo y revisa quién lo aceptó." : "Post work and see who claimed it."}</p></div>
+      <button className="primary compact" onClick={onCreate}>＋ {spanish ? "Publicar trabajo" : "Post new work"}</button></div>
     <div className="metrics">
-      <div><span>Open blocks</span><strong>{counts.open}</strong><small>Waiting for a cleaner</small></div>
-      <div><span>Assigned</span><strong>{counts.claimed}</strong><small>Claimed by employees</small></div>
-      <div><span>Upcoming pay</span><strong>${counts.payroll}</strong><small>Assigned blocks</small></div>
+      <div><span>{spanish ? "Trabajos abiertos" : "Open blocks"}</span><strong>{counts.open}</strong><small>{spanish ? "Esperando empleado" : "Waiting for a cleaner"}</small></div>
+      <div><span>{spanish ? "Asignados" : "Assigned"}</span><strong>{counts.claimed}</strong><small>{spanish ? "Aceptados por empleados" : "Claimed by employees"}</small></div>
+      <div><span>{spanish ? "Pago próximo" : "Upcoming pay"}</span><strong>${counts.payroll}</strong><small>{spanish ? "Trabajos asignados" : "Assigned blocks"}</small></div>
     </div>
     {alerts.length > 0 && <div className="owner-alerts">
-      <div><span>✓</span><strong>New acceptance</strong></div>
+      <div><span>✓</span><strong>{spanish ? "Nueva aceptación" : "New acceptance"}</strong></div>
       <p>{alerts[0]}</p><small>Owner email recipient: raarentalsllc@gmail.com</small>
     </div>}
-    <div className="owner-list"><div className="list-head"><h2>All work blocks</h2><span>{blocks.length} total</span></div>
+    <div className="owner-list"><div className="list-head"><h2>{spanish ? "Todos los trabajos" : "All work blocks"}</h2><span>{blocks.length} {spanish ? "en total" : "total"}</span></div>
       {blocks.map((block) => <article className="owner-row" key={block.id}>
         <div className="date-box"><b>{new Date(`${block.date}T12:00`).toLocaleDateString("en-US", { day: "2-digit" })}</b>
           <span>{new Date(`${block.date}T12:00`).toLocaleDateString("en-US", { month: "short" })}</span></div>
@@ -790,9 +786,9 @@ function OwnerWorkBoard({ blocks, employees, alerts, onCreate, onEdit, onDelete,
         <strong className="row-pay">${block.pay}</strong>
         <div className="row-actions">
           {!block.claimedBy && <AssignEmployee blockId={block.id} employees={employees} onAssign={onAssign} />}
-          {block.claimedBy && <button className="unassign" onClick={() => onUnassign(block.id)}>Unassign</button>}
-          <button className="row-edit" onClick={() => onEdit(block)}>Edit</button>
-          <button className="row-delete" onClick={() => onDelete(block.id)}>Delete</button>
+          {block.claimedBy && <button className="unassign" onClick={() => onUnassign(block.id)}>{spanish ? "Desasignar" : "Unassign"}</button>}
+          <button className="row-edit" onClick={() => onEdit(block)}>{spanish ? "Editar" : "Edit"}</button>
+          <button className="row-delete" onClick={() => onDelete(block.id)}>{spanish ? "Eliminar" : "Delete"}</button>
         </div>
       </article>)}
     </div>
