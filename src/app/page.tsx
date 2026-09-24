@@ -754,8 +754,72 @@ function OwnerView({ blocks, employees, alerts, onCreate, onEdit, onDelete, onAs
     </nav>
     {section === "employees"
       ? <EmployeeDirectory employees={employees} onSetActive={onSetEmployeeActive} onInvite={onInviteEmployee} />
-      : <OwnerWorkBoard blocks={blocks} employees={employees} alerts={alerts} onCreate={onCreate}
-          onEdit={onEdit} onDelete={onDelete} onAssign={onAssign} onUnassign={onUnassign} />}
+      : <><OwnerCalendar blocks={blocks} />
+        <OwnerWorkBoard blocks={blocks} employees={employees} alerts={alerts} onCreate={onCreate}
+          onEdit={onEdit} onDelete={onDelete} onAssign={onAssign} onUnassign={onUnassign} /></>}
+  </section>;
+}
+
+function OwnerCalendar({ blocks }: { blocks: WorkBlock[] }) {
+  const { spanish } = useAppLanguage();
+  const [visibleMonth, setVisibleMonth] = useState(() => {
+    const today = new Date();
+    return new Date(today.getFullYear(), today.getMonth(), 1);
+  });
+  const year = visibleMonth.getFullYear();
+  const month = visibleMonth.getMonth();
+  const firstWeekday = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const calendarDays = Array.from({ length: 42 }, (_, index) => {
+    const dayNumber = index - firstWeekday + 1;
+    return dayNumber >= 1 && dayNumber <= daysInMonth ? dayNumber : null;
+  });
+  const monthLabel = new Intl.DateTimeFormat(spanish ? "es-US" : "en-US", {
+    month: "long", year: "numeric",
+  }).format(visibleMonth);
+  const weekdayLabels = spanish
+    ? ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"]
+    : ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  const blocksByDay = useMemo(() => {
+    const result = new Map<number, WorkBlock[]>();
+    blocks.forEach((block) => {
+      const date = new Date(`${block.date}T12:00:00`);
+      if (date.getFullYear() !== year || date.getMonth() !== month) return;
+      const dateBlocks = result.get(date.getDate()) || [];
+      dateBlocks.push(block);
+      result.set(date.getDate(), dateBlocks);
+    });
+    return result;
+  }, [blocks, month, year]);
+  const moveMonth = (offset: number) => setVisibleMonth(new Date(year, month + offset, 1));
+
+  return <section className="owner-calendar" aria-label={spanish ? "Calendario de trabajos" : "Work calendar"}>
+    <div className="calendar-heading">
+      <div><h2>{spanish ? "Calendario de trabajos" : "Work calendar"}</h2>
+        <div className="calendar-legend">
+          <span><i className="calendar-open" />{spanish ? "Esperando aceptación" : "Waiting for acceptance"}</span>
+          <span><i className="calendar-claimed" />{spanish ? "Aceptado" : "Accepted"}</span>
+        </div>
+      </div>
+      <div className="calendar-controls">
+        <button type="button" aria-label={spanish ? "Mes anterior" : "Previous month"} onClick={() => moveMonth(-1)}>‹</button>
+        <strong>{monthLabel}</strong>
+        <button type="button" aria-label={spanish ? "Mes siguiente" : "Next month"} onClick={() => moveMonth(1)}>›</button>
+      </div>
+    </div>
+    <div className="calendar-scroll">
+      <div className="calendar-grid">
+        {weekdayLabels.map((label) => <div className="calendar-weekday" key={label}>{label}</div>)}
+        {calendarDays.map((dayNumber, index) => <div className={`calendar-day${dayNumber ? "" : " calendar-day-empty"}`} key={index}>
+          {dayNumber && <><span className="calendar-date">{dayNumber}</span>
+            <div className="calendar-jobs">{(blocksByDay.get(dayNumber) || []).map((block) =>
+              <div className={`calendar-job ${block.status === "open" ? "open" : "claimed"}`} key={block.id}
+                title={`${block.title} · ${time(block.startTime)} · ${block.city}`}>
+                <b>{block.title}</b><small>{time(block.startTime)} · {block.city}</small>
+              </div>)}</div></>}
+        </div>)}
+      </div>
+    </div>
   </section>;
 }
 
