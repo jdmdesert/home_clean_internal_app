@@ -145,6 +145,7 @@ export default function Home() {
 
   async function loadProductionData(currentSession: Session) {
     if (!supabase) return;
+    setAccountMenuOpen(false);
     setAppError("");
     const { data: profile, error: profileError } = await supabase
       .from("profiles").select("id, full_name, first_name, last_name, email, phone, address, preferred_language, role, active, onboarding_complete").eq("id", currentSession.user.id).single();
@@ -484,13 +485,13 @@ export default function Home() {
   </div></div>;
 
   return (
-    <main>
+    <main onClick={() => setAccountMenuOpen(false)}>
       <header className="topbar">
         <div className="brand"><span className="brand-mark">SC</span>
           <span><b>Steadfast &amp; Co.</b><small>Cleaning</small></span></div>
-        <div className="account-menu-wrap">
+        <div className="account-menu-wrap" onClick={(event) => event.stopPropagation()}>
           <button className="avatar" aria-label={`Account menu for ${account?.full_name || "signed-in user"}`}
-            aria-expanded={accountMenuOpen} onClick={() => setAccountMenuOpen((open) => !open)}>
+            aria-expanded={accountMenuOpen} onClick={(event) => { event.stopPropagation(); setAccountMenuOpen((open) => !open); }}>
             {accountInitials(account)}
           </button>
           {accountMenuOpen && <div className="account-menu">
