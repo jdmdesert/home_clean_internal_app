@@ -489,17 +489,25 @@ export default function Home() {
       <header className="topbar">
         <div className="brand"><span className="brand-mark">SC</span>
           <span><b>Steadfast &amp; Co.</b><small>Cleaning</small></span></div>
-        <div className="account-menu-wrap" onClick={(event) => event.stopPropagation()}>
-          <button className="avatar" aria-label={`Account menu for ${account?.full_name || "signed-in user"}`}
-            aria-expanded={accountMenuOpen} onClick={(event) => { event.stopPropagation(); setAccountMenuOpen((open) => !open); }}>
-            {accountInitials(account)}
-          </button>
-          {accountMenuOpen && <div className="account-menu">
-            <div className="account-menu-heading"><b>{account?.full_name}</b><span>{account?.email || session?.user.email}</span></div>
-            <button onClick={() => { setEditingProfile(true); setAccountMenuOpen(false); }}>{spanish ? "Editar información personal" : "Edit personal information"}</button>
-            <NotificationButton compact />
-            <button className="account-signout" onClick={() => void supabase?.auth.signOut()}>{spanish ? "Cerrar sesión" : "Log out"}</button>
-          </div>}
+        <div className="topbar-actions">
+          <div className="signed-in-language" role="group" aria-label={spanish ? "Cambiar idioma" : "Change language"}>
+            <button type="button" className={!spanish ? "active" : ""} lang="en"
+              aria-pressed={!spanish} onClick={() => setPreferredLanguage("en")}>EN</button>
+            <button type="button" className={spanish ? "active" : ""} lang="es"
+              aria-pressed={spanish} onClick={() => setPreferredLanguage("es")}>ES</button>
+          </div>
+          <div className="account-menu-wrap" onClick={(event) => event.stopPropagation()}>
+            <button className="avatar" aria-label={`Account menu for ${account?.full_name || "signed-in user"}`}
+              aria-expanded={accountMenuOpen} onClick={(event) => { event.stopPropagation(); setAccountMenuOpen((open) => !open); }}>
+              {accountInitials(account)}
+            </button>
+            {accountMenuOpen && <div className="account-menu">
+              <div className="account-menu-heading"><b>{account?.full_name}</b><span>{account?.email || session?.user.email}</span></div>
+              <button onClick={() => { setEditingProfile(true); setAccountMenuOpen(false); }}>{spanish ? "Editar información personal" : "Edit personal information"}</button>
+              <NotificationButton compact />
+              <button className="account-signout" onClick={() => void supabase?.auth.signOut()}>{spanish ? "Cerrar sesión" : "Log out"}</button>
+            </div>}
+          </div>
         </div>
       </header>
       <div className="demo-bar">
