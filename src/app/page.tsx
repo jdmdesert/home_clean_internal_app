@@ -751,12 +751,14 @@ function OwnerView({ blocks, employees, alerts, onCreate, onEdit, onDelete, onAs
       <button className={section === "work" ? "active" : ""} onClick={() => setSection("work")}>{spanish ? "Tablero" : "Work board"}</button>
       <button className={section === "employees" ? "active" : ""} onClick={() => setSection("employees")}>
         {spanish ? "Empleados" : "Employees"} <span>{employees.length}</span></button>
+      {section === "work" && <button className="post-work-tab" onClick={onCreate}>
+        ＋ {spanish ? "Publicar trabajo" : "Post new work"}</button>}
     </nav>
     {section === "employees"
       ? <EmployeeDirectory employees={employees} onSetActive={onSetEmployeeActive} onInvite={onInviteEmployee} />
       : <><OwnerCalendar blocks={blocks} />
-        <OwnerWorkBoard blocks={blocks} employees={employees} alerts={alerts} onCreate={onCreate}
-          onEdit={onEdit} onDelete={onDelete} onAssign={onAssign} onUnassign={onUnassign} /></>}
+        <OwnerWorkBoard blocks={blocks} employees={employees} alerts={alerts} onEdit={onEdit}
+          onDelete={onDelete} onAssign={onAssign} onUnassign={onUnassign} /></>}
   </section>;
 }
 
@@ -823,8 +825,8 @@ function OwnerCalendar({ blocks }: { blocks: WorkBlock[] }) {
   </section>;
 }
 
-function OwnerWorkBoard({ blocks, employees, alerts, onCreate, onEdit, onDelete, onAssign, onUnassign }: {
-  blocks: WorkBlock[]; employees: EmployeeProfile[]; alerts: string[]; onCreate: () => void;
+function OwnerWorkBoard({ blocks, employees, alerts, onEdit, onDelete, onAssign, onUnassign }: {
+  blocks: WorkBlock[]; employees: EmployeeProfile[]; alerts: string[];
   onEdit: (block: WorkBlock) => void; onDelete: (id: string) => void;
   onAssign: (id: string, employeeId: string) => void; onUnassign: (id: string) => void;
 }) {
@@ -836,8 +838,7 @@ function OwnerWorkBoard({ blocks, employees, alerts, onCreate, onEdit, onDelete,
   }), [blocks]);
   return <>
     <div className="owner-heading"><div><p className="eyebrow">{spanish ? "PANEL DEL PROPIETARIO" : "OWNER DASHBOARD"}</p><h1>{spanish ? "Tablero de trabajo" : "Work board"}</h1>
-      <p>{spanish ? "Publica trabajo y revisa quién lo aceptó." : "Post work and see who claimed it."}</p></div>
-      <button className="primary compact" onClick={onCreate}>＋ {spanish ? "Publicar trabajo" : "Post new work"}</button></div>
+      <p>{spanish ? "Publica trabajo y revisa quién lo aceptó." : "Post work and see who claimed it."}</p></div></div>
     <div className="metrics">
       <div><span>{spanish ? "Trabajos abiertos" : "Open blocks"}</span><strong>{counts.open}</strong><small>{spanish ? "Esperando empleado" : "Waiting for a cleaner"}</small></div>
       <div><span>{spanish ? "Asignados" : "Assigned"}</span><strong>{counts.claimed}</strong><small>{spanish ? "Aceptados por empleados" : "Claimed by employees"}</small></div>
