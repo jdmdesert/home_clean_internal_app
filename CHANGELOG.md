@@ -68,6 +68,7 @@ All notable changes to the Steadfast & Co. Cleaning Team App are recorded here.
 - Added authenticated database grants required by Supabase PostgREST.
 - Added a safe migration for the original `admin` and `cleaner` profile roles.
 - Added an owner-only database policy for deleting work blocks.
+- Removed the duplicate production `SUPABASE_URL` requirement so Netlify does not flag the intentionally public project URL as a leaked secret.
 
 ### Development and mobile preview
 

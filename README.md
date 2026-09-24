@@ -35,7 +35,8 @@ experiences.
    and private keys to `.env.local`. Set `VAPID_SUBJECT` to an owner email address.
 7. Run `npm run dev`, sign in as each temporary employee, and tap **Enable notifications**.
 8. Deploy to Vercel and copy the same production environment variables into the Vercel
-   project. Keep `SUPABASE_SERVICE_ROLE_KEY`, `VAPID_PRIVATE_KEY`, and the pilot password
+   project. Keep `SUPABASE_SECRET_KEY` (or the legacy `SUPABASE_SERVICE_ROLE_KEY`),
+   `VAPID_PRIVATE_KEY`, and the pilot password
    server-only.
 
 The two employee accounts are test seats. They can be renamed later, or removed and
@@ -84,7 +85,8 @@ last name, and email address. Before using invitations in production:
    to the contents of [`supabase/email-templates/invite-subject.txt`](supabase/email-templates/invite-subject.txt)
    and the body to [`supabase/email-templates/invite.html`](supabase/email-templates/invite.html).
 3. In Netlify, set `NEXT_PUBLIC_SITE_URL=https://steadfast-cleaning.netlify.app`,
-   `SUPABASE_URL`, and the server-only `SUPABASE_SERVICE_ROLE_KEY`, then redeploy.
+   and the server-only `SUPABASE_SECRET_KEY`, then redeploy. The server reuses the
+   public project URL, so a duplicate `SUPABASE_URL` variable is not required.
 4. Keep `https://steadfast-cleaning.netlify.app/**` in the Supabase authentication redirect allow list.
 
 The iOS and Android email buttons use the same secure, single-use Supabase invitation.
