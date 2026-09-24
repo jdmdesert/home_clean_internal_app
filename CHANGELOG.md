@@ -43,6 +43,7 @@ All notable changes to the Steadfast & Co. Cleaning Team App are recorded here.
 - Added an owner-only monthly work calendar beneath the Work Board and Employees tabs, with previous/next month navigation.
 - Added yellow calendar entries for posted work awaiting acceptance and green entries once an employee accepts or is assigned.
 - Moved the owner “Post new work” action into the tab row above the calendar.
+- Positioned the Open blocks, Assigned, and Upcoming pay dashboard modules together directly above the owner calendar.
 - Added owner job creation using cleaning-service templates.
 - Added editable dates, arrival windows, departure times, pay, city, ZIP code, square footage, occupancy, addresses, access codes, checklists, and private notes.
 - Added owner controls to edit and delete jobs.

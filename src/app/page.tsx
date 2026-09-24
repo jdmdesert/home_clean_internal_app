@@ -782,9 +782,8 @@ function OwnerView({ blocks, employees, alerts, onCreate, onEdit, onDelete, onAs
     </nav>
     {section === "employees"
       ? <EmployeeDirectory employees={employees} onSetActive={onSetEmployeeActive} onInvite={onInviteEmployee} />
-      : <><OwnerCalendar blocks={blocks} />
-        <OwnerWorkBoard blocks={blocks} employees={employees} alerts={alerts} onEdit={onEdit}
-          onDelete={onDelete} onAssign={onAssign} onUnassign={onUnassign} /></>}
+      : <OwnerWorkBoard blocks={blocks} employees={employees} alerts={alerts} onEdit={onEdit}
+          onDelete={onDelete} onAssign={onAssign} onUnassign={onUnassign} />}
   </section>;
 }
 
@@ -870,6 +869,7 @@ function OwnerWorkBoard({ blocks, employees, alerts, onEdit, onDelete, onAssign,
       <div><span>{spanish ? "Asignados" : "Assigned"}</span><strong>{counts.claimed}</strong><small>{spanish ? "Aceptados por empleados" : "Claimed by employees"}</small></div>
       <div><span>{spanish ? "Pago próximo" : "Upcoming pay"}</span><strong>${counts.payroll}</strong><small>{spanish ? "Trabajos asignados" : "Assigned blocks"}</small></div>
     </div>
+    <OwnerCalendar blocks={blocks} />
     {alerts.length > 0 && <div className="owner-alerts">
       <div><span>✓</span><strong>{spanish ? "Nueva aceptación" : "New acceptance"}</strong></div>
       <p>{alerts[0]}</p><small>Owner email recipient: raarentalsllc@gmail.com</small>
