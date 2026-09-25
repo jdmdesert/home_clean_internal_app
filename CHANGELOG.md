@@ -22,6 +22,11 @@ All notable changes to the Steadfast & Co. Cleaning Team App are recorded here.
 
 ### Authentication and accounts
 
+- Added immutable, sequential employee ID numbers for stable identification even when names change.
+- Added database-level employee profile audit history with changed fields, modifier identity, and Arizona-time display.
+- Added owner-selected English or Spanish invitation language and matching registration defaults.
+- Rebuilt the welcome email as a bilingual, branded template with a secure clickable application link.
+- Prefilled invited employees’ names and email addresses during registration to reduce setup errors.
 - Added an owner-only employee profile action that sends a secure, single-use password reset email through Supabase.
 - Connected the app to Supabase authentication and database records.
 - Added owner and employee roles with two initial pilot seats for each role.

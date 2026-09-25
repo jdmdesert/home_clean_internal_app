@@ -23,6 +23,7 @@ type AccountProfile = {
   id: string; full_name: string; first_name: string | null; last_name: string | null;
   email: string | null; phone: string | null; address: string | null;
   preferred_language: string | null; role: Role; active: boolean; onboarding_complete: boolean;
+  employee_number?: number | null;
 };
 type WorkBlockRow = {
   id: string; title: string; starts_at: string; ends_at: string; city: string;
@@ -148,7 +149,7 @@ export default function Home() {
     setAccountMenuOpen(false);
     setAppError("");
     const { data: profile, error: profileError } = await supabase
-      .from("profiles").select("id, full_name, first_name, last_name, email, phone, address, preferred_language, role, active, onboarding_complete").eq("id", currentSession.user.id).single();
+      .from("profiles").select("id, full_name, first_name, last_name, email, phone, address, preferred_language, role, active, onboarding_complete, employee_number").eq("id", currentSession.user.id).single();
     if (profileError || !profile) {
       setAppError("This account has not been added to the cleaning team yet.");
       setLoading(false);
@@ -157,7 +158,10 @@ export default function Home() {
     const typedProfile = profile as AccountProfile;
     setAccount(typedProfile);
     setRole(typedProfile.role);
-    if (typedProfile.role === "employee" && !typedProfile.onboarding_complete) setShowRegistration(true);
+    if (typedProfile.role === "employee" && !typedProfile.onboarding_complete) {
+      setPreferredLanguage(typedProfile.preferred_language === "Español" ? "es" : "en");
+      setShowRegistration(true);
+    }
 
     const { data: profileRows } = typedProfile.role === "owner"
       ? await supabase.from("profiles").select("*").eq("role", "employee").order("full_name")
@@ -173,8 +177,19 @@ export default function Home() {
     else setBlocks(((workRows || []) as WorkBlockRow[]).map((row) => rowToBlock(row, names)));
 
     if (typedProfile.role === "owner") {
+      const { data: auditRows } = await supabase.from("employee_profile_history")
+        .select("id, employee_id, action, changed_fields, modified_by_name, modified_by_role, changed_at")
+        .order("changed_at", { ascending: false }).limit(500);
+      const auditByEmployee = new Map<string, NonNullable<EmployeeProfile["auditHistory"]>>();
+      (auditRows || []).forEach((entry) => {
+        const history = auditByEmployee.get(entry.employee_id) || [];
+        history.push({ id: entry.id, action: entry.action, changedFields: entry.changed_fields || [],
+          modifiedByName: entry.modified_by_name, modifiedByRole: entry.modified_by_role, changedAt: entry.changed_at });
+        auditByEmployee.set(entry.employee_id, history);
+      });
       setEmployees((profileRows || []).map((item) => ({
-        id: item.id, language: item.preferred_language || "English",
+        id: item.id, employeeNumber: item.employee_number, auditHistory: auditByEmployee.get(item.id) || [],
+        language: item.preferred_language || "English",
         firstName: item.first_name || "", lastName: item.last_name || "", name: item.full_name,
         dateOfBirth: item.date_of_birth || "", email: item.email || "Managed through login", address: item.address || "", phone: item.phone || "",
         paymentMethod: item.payment_method || "Other", paymentContact: item.payment_contact || "",
@@ -455,11 +470,11 @@ export default function Home() {
     setShowRegistration(false);
     notify("Registration complete. Welcome to the team!");
   }
-  async function inviteEmployee(firstName: string, lastName: string, email: string) {
+  async function inviteEmployee(firstName: string, lastName: string, email: string, language: "English" | "Español") {
     if (!session) return "Please sign in again before sending an invitation.";
     const response = await fetch("/api/employees/invite", {
       method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` },
-      body: JSON.stringify({ firstName, lastName, email }),
+      body: JSON.stringify({ firstName, lastName, email, language }),
     });
     const result = await response.json() as { error?: string };
     if (!response.ok) return result.error || "The invitation could not be sent.";
@@ -557,7 +572,8 @@ export default function Home() {
         </>}
       </div>
       {role === "employee" ? (showRegistration
-        ? <EmployeeRegistration onComplete={completeRegistration} onCancel={() => setShowRegistration(false)} />
+        ? <EmployeeRegistration onComplete={completeRegistration} onCancel={() => setShowRegistration(false)}
+            initialValues={{ firstName: account?.first_name || "", lastName: account?.last_name || "", email: account?.email || session?.user.email || "" }} />
         : <EmployeeView blocks={shown} availableCount={available.length} tab={tab} setTab={setTab} claim={claim} />)
         : <OwnerView blocks={blocks} employees={employees} alerts={ownerAlerts}
           onCreate={() => setShowForm(true)} onEdit={setEditingBlock} onDelete={deleteBlock}
@@ -779,7 +795,7 @@ function OwnerView({ blocks, employees, alerts, onCreate, onEdit, onDelete, onAs
   onCreate: () => void; onEdit: (block: WorkBlock) => void; onDelete: (id: string) => void;
   onAssign: (id: string, employeeId: string) => void; onUnassign: (id: string) => void;
   onSetEmployeeActive: (id: string, active: boolean) => void;
-  onInviteEmployee: (firstName: string, lastName: string, email: string) => Promise<string | void>;
+  onInviteEmployee: (firstName: string, lastName: string, email: string, language: "English" | "Español") => Promise<string | void>;
   onResetEmployeePassword: (employeeId: string) => Promise<string | void>;
 }) {
   const [section, setSection] = useState<"work" | "employees">("work");

@@ -15,7 +15,7 @@ const money = (value: number) => new Intl.NumberFormat("en-US",
 
 export function EmployeeDirectory({ employees, onSetActive, onInvite, onResetPassword }: {
   employees: EmployeeProfile[]; onSetActive: (id: string, active: boolean) => void;
-  onInvite?: (firstName: string, lastName: string, email: string) => Promise<string | void>;
+  onInvite?: (firstName: string, lastName: string, email: string, language: "English" | "Español") => Promise<string | void>;
   onResetPassword?: (employeeId: string) => Promise<string | void>;
 }) {
   const [selected, setSelected] = useState<EmployeeProfile | null>(null);
@@ -32,6 +32,7 @@ export function EmployeeDirectory({ employees, onSetActive, onInvite, onResetPas
       String(form.get("firstName")).trim(),
       String(form.get("lastName")).trim(),
       String(form.get("email")).trim(),
+      String(form.get("language")) as "English" | "Español",
     );
     setInviting(false);
     if (error) setInviteError(error);
@@ -53,7 +54,7 @@ export function EmployeeDirectory({ employees, onSetActive, onInvite, onResetPas
     <div className="employee-stack">
       {employees.map((employee) => <button className="employee-row" key={employee.id} onClick={() => setSelected(employee)}>
         <div className="employee-initials">{employee.name.split(" ").map((part) => part[0]).slice(0, 2).join("")}</div>
-        <div className="employee-name"><b>{employee.name}</b><span>{employee.phone || employee.email}</span>
+        <div className="employee-name"><b>{employee.name}</b><span>{employee.employeeNumber ? `SC-${String(employee.employeeNumber).padStart(6, "0")} · ` : ""}{employee.phone || employee.email}</span>
           <span className={`account-status ${employee.active ? "active" : "inactive"}`}>
             <i />{employee.active ? "Active" : employee.phone ? "Inactive" : "Invitation pending"}
           </span>
@@ -70,6 +71,12 @@ export function EmployeeDirectory({ employees, onSetActive, onInvite, onResetPas
         <label>First name<input name="firstName" autoComplete="given-name" required /></label>
         <label>Last name<input name="lastName" autoComplete="family-name" required /></label>
         <label className="wide">Email address<input name="email" type="email" autoComplete="email" required /></label>
+        <label className="wide">Invitation language
+          <select name="language" defaultValue="English" required>
+            <option value="English">English</option><option value="Español">Español</option>
+          </select>
+          <small className="field-note">The welcome email and registration screen will use this language.</small>
+        </label>
         {inviteError && <p className="form-error wide">{inviteError}</p>}
         <div className="form-actions"><button type="button" className="secondary" onClick={() => setInviteOpen(false)}>Cancel</button>
           <button className="primary" disabled={inviting}>{inviting ? "Sending…" : "Send invitation"}</button></div>
@@ -112,6 +119,7 @@ function EmployeeDetail({ employee, onBack, onSetActive, onResetPassword }: {
     <div className="profile-header">
       <div className="profile-avatar">{employee.name.split(" ").map((part) => part[0]).slice(0, 2).join("")}</div>
       <div><p className="eyebrow">EMPLOYEE PROFILE</p><h2>{employee.name}</h2>
+        <p className="employee-id">Employee ID: <b>{employee.employeeNumber ? `SC-${String(employee.employeeNumber).padStart(6, "0")}` : "Pending setup"}</b></p>
         <p>Team member since {new Date(employee.joinedAt).toLocaleDateString("en-US", { month: "long", year: "numeric" })}</p>
         <span className={`account-status ${employee.active ? "active" : "inactive"}`}>
           <i />{employee.active ? "Active" : "Inactive"}</span></div>
@@ -152,6 +160,25 @@ function EmployeeDetail({ employee, onBack, onSetActive, onResetPassword }: {
         <dl><dt>Completed jobs</dt><dd>{employee.completedJobs}</dd>
           <dt>Attendance</dt><dd>{employee.attendanceRate === null ? "Not yet rated" : `${employee.attendanceRate}%`}</dd>
           <dt>Standing note</dt><dd>{employee.standingNote}</dd></dl></section>
+      <section className="audit-history"><h3>Profile audit history</h3>
+        {employee.auditHistory?.length ? <div className="audit-list">{employee.auditHistory.map((entry) =>
+          <article key={entry.id}><div><b>{entry.action === "created" ? "Profile created" : "Profile updated"}</b>
+            <time>{new Intl.DateTimeFormat("en-US", { timeZone: "America/Phoenix", dateStyle: "medium", timeStyle: "short" }).format(new Date(entry.changedAt))} Arizona time</time></div>
+            <p>{entry.action === "created" ? "Employee profile created" : `Changed: ${entry.changedFields.map(formatAuditField).join(", ")}`}</p>
+            <small>Modified by {entry.modifiedByName} ({entry.modifiedByRole})</small>
+          </article>)}</div> : <p className="audit-empty">No profile changes have been recorded yet.</p>}
+      </section>
     </div>
   </div>;
+}
+
+function formatAuditField(field: string) {
+  const labels: Record<string, string> = {
+    full_name: "name", first_name: "first name", last_name: "last name", date_of_birth: "date of birth",
+    email: "email", address: "home address", preferred_language: "language", phone: "phone number",
+    payment_method: "payment method", payment_contact: "payment contact", service_area: "service area",
+    emergency_contact: "emergency contact", onboarding_complete: "registration status", standing: "standing",
+    performance_score: "performance score", standing_note: "standing note", active: "account status",
+  };
+  return labels[field] || field.replaceAll("_", " ");
 }

@@ -6,8 +6,19 @@ import { useAppLanguage } from "@/lib/language";
 
 export type EmployeeStanding = "new" | "good" | "watch" | "risk";
 
+export type EmployeeAuditEntry = {
+  id: number;
+  action: "created" | "updated";
+  changedFields: string[];
+  modifiedByName: string;
+  modifiedByRole: string;
+  changedAt: string;
+};
+
 export type EmployeeProfile = {
   id: string;
+  employeeNumber?: number | null;
+  auditHistory?: EmployeeAuditEntry[];
   language: "English" | "Español";
   firstName: string;
   lastName: string;
@@ -32,9 +43,10 @@ export type EmployeeProfile = {
   paidLifetime: number;
 };
 
-export function EmployeeRegistration({ onComplete }: {
+export function EmployeeRegistration({ onComplete, initialValues }: {
   onComplete: (employee: EmployeeProfile, password: string) => Promise<string | void> | string | void;
   onCancel?: () => void;
+  initialValues?: { firstName?: string; lastName?: string; email?: string };
 }) {
   const { language: appLanguage, setLanguage: setAppLanguage } = useAppLanguage();
   const language: "English" | "Español" = appLanguage === "es" ? "Español" : "English";
@@ -93,10 +105,10 @@ export function EmployeeRegistration({ onComplete }: {
       </div>
       <p className="eyebrow">{copy.eyebrow}</p><h1>{copy.title}</h1><p>{copy.intro}</p>
       <form onSubmit={submit}>
-        <label>{copy.firstName}<input name="firstName" autoComplete="given-name" required /></label>
-        <label>{copy.lastName}<input name="lastName" autoComplete="family-name" required /></label>
+        <label>{copy.firstName}<input name="firstName" autoComplete="given-name" defaultValue={initialValues?.firstName} required /></label>
+        <label>{copy.lastName}<input name="lastName" autoComplete="family-name" defaultValue={initialValues?.lastName} required /></label>
         <label>{copy.dob}<input name="dateOfBirth" type="date" max={new Date().toISOString().slice(0, 10)} required /></label>
-        <label>{copy.email}<input name="email" type="email" autoComplete="email" required /></label>
+        <label>{copy.email}<input name="email" type="email" autoComplete="email" defaultValue={initialValues?.email} readOnly={Boolean(initialValues?.email)} required /></label>
         <label>{copy.phone}<input name="phone" type="tel" autoComplete="tel" required placeholder="(602) 555-0100" /></label>
         <label className="wide">{copy.address}<input name="address" autoComplete="street-address" required /></label>
         <label>{spanish ? "Crear contraseña" : "Create password"}<input name="password" type="password" autoComplete="new-password" minLength={8} required /></label>

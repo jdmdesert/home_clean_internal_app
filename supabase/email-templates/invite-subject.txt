@@ -1,1 +1,1 @@
-Welcome to Steadfast & Co. Cleaning
+{{ if eq (index .Data "preferred_language") "Español" }}Bienvenido a Steadfast & Co. Cleaning{{ else }}Welcome to Steadfast & Co. Cleaning{{ end }}

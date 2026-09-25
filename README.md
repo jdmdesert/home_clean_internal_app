@@ -91,6 +91,14 @@ last name, and email address. Before using invitations in production:
 
 The iOS and Android email buttons use the same secure, single-use Supabase invitation.
 
+### Employee IDs, audit history, and bilingual invitations
+
+Run [`supabase/employee_audit_and_language_upgrade.sql`](supabase/employee_audit_and_language_upgrade.sql)
+once in the Supabase SQL Editor. Then update the Supabase **Invite user** subject and body with
+the files in [`supabase/email-templates`](supabase/email-templates). Existing employees receive a
+permanent employee number, and future profile changes record the modifier and timestamp. Timestamps
+are stored safely as `timestamptz` and displayed in the app using the `America/Phoenix` time zone.
+
 ### Account settings and notifications
 
 Run [`supabase/profile_settings_upgrade.sql`](supabase/profile_settings_upgrade.sql) once in the

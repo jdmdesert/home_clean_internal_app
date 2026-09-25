@@ -20,18 +20,19 @@ export async function POST(request: Request) {
   if (ownerError) return Response.json({ error: `Owner verification failed: ${ownerError.message}` }, { status: 500 });
   if (!owner) return Response.json({ error: "Owner access required." }, { status: 403 });
 
-  const body = await request.json() as { firstName?: string; lastName?: string; email?: string };
+  const body = await request.json() as { firstName?: string; lastName?: string; email?: string; language?: string };
   const firstName = body.firstName?.trim();
   const lastName = body.lastName?.trim();
   const name = firstName && lastName ? `${firstName} ${lastName}` : "";
   const email = body.email?.trim().toLowerCase();
+  const language = body.language === "Español" ? "Español" : "English";
   if (!name || !email || !/^\S+@\S+\.\S+$/.test(email)) {
     return Response.json({ error: "Enter the employee’s first name, last name, and a valid email address." }, { status: 400 });
   }
 
   const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || "https://steadfast-cleaning.netlify.app").replace(/\/$/, "");
   const { data: invitation, error: inviteError } = await admin.auth.admin.inviteUserByEmail(email, {
-    data: { full_name: name, first_name: firstName, last_name: lastName, role: "employee" },
+    data: { full_name: name, first_name: firstName, last_name: lastName, role: "employee", preferred_language: language },
     redirectTo: `${siteUrl}/?invite=1`,
   });
   if (inviteError || !invitation.user) {
@@ -41,7 +42,7 @@ export async function POST(request: Request) {
 
   const { error: profileError } = await userClient.rpc("create_invited_employee_profile", {
     employee_id: invitation.user.id, first_name_input: firstName,
-    last_name_input: lastName, email_input: email,
+    last_name_input: lastName, email_input: email, language_input: language,
   });
   if (profileError) {
     await admin.auth.admin.deleteUser(invitation.user.id);
