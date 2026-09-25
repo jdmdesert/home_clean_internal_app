@@ -22,6 +22,7 @@ All notable changes to the Steadfast & Co. Cleaning Team App are recorded here.
 
 ### Authentication and accounts
 
+- Added an owner-only employee profile action that sends a secure, single-use password reset email through Supabase.
 - Connected the app to Supabase authentication and database records.
 - Added owner and employee roles with two initial pilot seats for each role.
 - Replaced demo avatar initials with initials generated from the signed-in user's profile.
@@ -45,6 +46,7 @@ All notable changes to the Steadfast & Co. Cleaning Team App are recorded here.
 - Moved the owner “Post new work” action into the tab row above the calendar.
 - Positioned the Open blocks, Assigned, and Upcoming pay dashboard modules together directly above the owner calendar.
 - Compacted the owner summary modules into one three-column row on mobile instead of stacking them vertically.
+- Fit all seven calendar days into a single mobile-screen view without horizontal scrolling.
 - Added owner job creation using cleaning-service templates.
 - Added editable dates, arrival windows, departure times, pay, city, ZIP code, square footage, occupancy, addresses, access codes, checklists, and private notes.
 - Added owner controls to edit and delete jobs.

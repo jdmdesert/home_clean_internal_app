@@ -466,6 +466,16 @@ export default function Home() {
     notify(`Invitation sent to ${email}.`);
     await loadProductionData(session);
   }
+  async function resetEmployeePassword(employeeId: string) {
+    if (!session) return "Please sign in again before resetting a password.";
+    const response = await fetch("/api/employees/reset-password", {
+      method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` },
+      body: JSON.stringify({ employeeId }),
+    });
+    const result = await response.json() as { error?: string };
+    if (!response.ok) return result.error || "The password reset email could not be sent.";
+    return undefined;
+  }
   async function setEmployeeActive(id: string, active: boolean) {
     if (supabase && session) {
       const { error } = await supabase.rpc("set_employee_active", { employee_id: id, active_input: active });
@@ -552,7 +562,8 @@ export default function Home() {
         : <OwnerView blocks={blocks} employees={employees} alerts={ownerAlerts}
           onCreate={() => setShowForm(true)} onEdit={setEditingBlock} onDelete={deleteBlock}
           onAssign={assignBlock} onUnassign={unassignBlock}
-          onSetEmployeeActive={setEmployeeActive} onInviteEmployee={inviteEmployee} />}
+          onSetEmployeeActive={setEmployeeActive} onInviteEmployee={inviteEmployee}
+          onResetEmployeePassword={resetEmployeePassword} />}
       {showForm && <CreateBlock onClose={() => setShowForm(false)} onCreate={createBlock} />}
       {editingBlock && <CreateBlock key={editingBlock.id} initialBlock={editingBlock}
         onClose={() => setEditingBlock(null)} onCreate={updateBlock} />}
@@ -763,12 +774,13 @@ function JobCard({ block, onClaim }: { block: WorkBlock; onClaim: (id: string) =
   </article>;
 }
 
-function OwnerView({ blocks, employees, alerts, onCreate, onEdit, onDelete, onAssign, onUnassign, onSetEmployeeActive, onInviteEmployee }: {
+function OwnerView({ blocks, employees, alerts, onCreate, onEdit, onDelete, onAssign, onUnassign, onSetEmployeeActive, onInviteEmployee, onResetEmployeePassword }: {
   blocks: WorkBlock[]; employees: EmployeeProfile[]; alerts: string[];
   onCreate: () => void; onEdit: (block: WorkBlock) => void; onDelete: (id: string) => void;
   onAssign: (id: string, employeeId: string) => void; onUnassign: (id: string) => void;
   onSetEmployeeActive: (id: string, active: boolean) => void;
   onInviteEmployee: (firstName: string, lastName: string, email: string) => Promise<string | void>;
+  onResetEmployeePassword: (employeeId: string) => Promise<string | void>;
 }) {
   const [section, setSection] = useState<"work" | "employees">("work");
   const { spanish } = useAppLanguage();
@@ -781,7 +793,8 @@ function OwnerView({ blocks, employees, alerts, onCreate, onEdit, onDelete, onAs
         ＋ {spanish ? "Publicar trabajo" : "Post new work"}</button>}
     </nav>
     {section === "employees"
-      ? <EmployeeDirectory employees={employees} onSetActive={onSetEmployeeActive} onInvite={onInviteEmployee} />
+      ? <EmployeeDirectory employees={employees} onSetActive={onSetEmployeeActive} onInvite={onInviteEmployee}
+          onResetPassword={onResetEmployeePassword} />
       : <OwnerWorkBoard blocks={blocks} employees={employees} alerts={alerts} onEdit={onEdit}
           onDelete={onDelete} onAssign={onAssign} onUnassign={onUnassign} />}
   </section>;

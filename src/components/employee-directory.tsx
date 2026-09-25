@@ -13,9 +13,10 @@ const standingCopy: Record<EmployeeStanding, { label: string; description: strin
 const money = (value: number) => new Intl.NumberFormat("en-US",
   { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(value);
 
-export function EmployeeDirectory({ employees, onSetActive, onInvite }: {
+export function EmployeeDirectory({ employees, onSetActive, onInvite, onResetPassword }: {
   employees: EmployeeProfile[]; onSetActive: (id: string, active: boolean) => void;
   onInvite?: (firstName: string, lastName: string, email: string) => Promise<string | void>;
+  onResetPassword?: (employeeId: string) => Promise<string | void>;
 }) {
   const [selected, setSelected] = useState<EmployeeProfile | null>(null);
   const [inviting, setInviting] = useState(false);
@@ -38,6 +39,7 @@ export function EmployeeDirectory({ employees, onSetActive, onInvite }: {
   }
 
   if (selected) return <EmployeeDetail employee={selected} onBack={() => setSelected(null)}
+    onResetPassword={onResetPassword}
     onSetActive={(active) => {
       onSetActive(selected.id, active);
       setSelected({ ...selected, active });
@@ -85,13 +87,25 @@ function StandingRing({ employee }: { employee: EmployeeProfile }) {
   </div>;
 }
 
-function EmployeeDetail({ employee, onBack, onSetActive }: {
+function EmployeeDetail({ employee, onBack, onSetActive, onResetPassword }: {
   employee: EmployeeProfile; onBack: () => void; onSetActive: (active: boolean) => void;
+  onResetPassword?: (employeeId: string) => Promise<string | void>;
 }) {
+  const [resettingPassword, setResettingPassword] = useState(false);
+  const [resetMessage, setResetMessage] = useState("");
+  const [resetError, setResetError] = useState("");
   function toggleActive() {
     const action = employee.active ? "Deactivate" : "Reactivate";
     if (!window.confirm(`${action} ${employee.name}'s account?`)) return;
     onSetActive(!employee.active);
+  }
+  async function resetPassword() {
+    if (!onResetPassword || !window.confirm(`Send a secure password reset email to ${employee.email}?`)) return;
+    setResettingPassword(true); setResetMessage(""); setResetError("");
+    const error = await onResetPassword(employee.id);
+    setResettingPassword(false);
+    if (error) setResetError(error);
+    else setResetMessage(`Password reset email sent to ${employee.email}.`);
   }
   return <div className="employee-detail">
     <button className="detail-back" onClick={onBack}>← All employees</button>
@@ -106,9 +120,15 @@ function EmployeeDetail({ employee, onBack, onSetActive }: {
     <div className="account-actions">
       <div><b>{employee.active ? "Active account" : "Inactive account"}</b>
         <span>{employee.active ? "Can receive and accept new work." : "Cannot receive or accept new work."}</span></div>
-      <button className={employee.active ? "deactivate-button" : "reactivate-button"} onClick={toggleActive}>
-        {employee.active ? "Deactivate employee" : "Reactivate employee"}</button>
+      <div className="employee-account-buttons">
+        {onResetPassword && <button className="reset-password-button" disabled={resettingPassword} onClick={() => void resetPassword()}>
+          {resettingPassword ? "Sending…" : "Send password reset"}</button>}
+        <button className={employee.active ? "deactivate-button" : "reactivate-button"} onClick={toggleActive}>
+          {employee.active ? "Deactivate employee" : "Reactivate employee"}</button>
+      </div>
     </div>
+    {resetMessage && <p className="account-action-message success">{resetMessage}</p>}
+    {resetError && <p className="account-action-message error">{resetError}</p>}
     <div className="payment-summary">
       <div><span>Paid this month</span><strong>{money(employee.paidMonth)}</strong></div>
       <div><span>Paid this year</span><strong>{money(employee.paidYear)}</strong></div>
